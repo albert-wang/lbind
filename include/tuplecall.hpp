@@ -3,21 +3,23 @@
 #include "traits.hpp"
 #include "convert.hpp"
 
-template<typename F, int arity, bool isMember>
-struct TupleCall
+namespace LBind
 {
-};
-
-template<typename F>
-struct TupleCall<F, 0, false>
-{
-	typedef FunctionTraits<F> Traits;
-
-	static typename Traits::result_type apply(F f, boost::fusion::vector0<> args)
+	template<typename F, int arity, bool isMember>
+	struct TupleCall
 	{
-		return f();
-	}
-};
+	};
+
+	template<typename F>
+	struct TupleCall<F, 0, false>
+	{
+		typedef FunctionTraits<F> Traits;
+
+		static typename Traits::result_type apply(F f, boost::fusion::vector0<> args)
+		{
+			return f();
+		}
+	};
 
 #define BOOST_PP_LOCAL_LIMITS (1, 10)
 #define FORWARD_ARGS(z, n, d) BOOST_PP_COMMA_IF(BOOST_PP_SUB(n, d)) std::forward<typename boost::remove_reference<typename result_of::at_c<parameter_tuple, n>::type>::type>(Convert<typename boost::remove_cv<typename boost::remove_reference<typename result_of::at_c<parameter_tuple, n>::type>::type>::type>::forward(std::move(at_c<n>(args))))
@@ -61,3 +63,4 @@ struct TupleCall<F, 0, false>
 #undef BOOST_PP_LOCAL_MACRO
 #undef BOOST_PP_LOCAL_LIMITS
 #undef FORWARD_ARGS
+}

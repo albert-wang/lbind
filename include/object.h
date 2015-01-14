@@ -1,16 +1,273 @@
 #pragma once
 #include "lua.hpp"
+#include "convert.hpp"
 
-//TODO: THIS LEAKS REFERENCES.
-class Object
+#include <boost/utility/string_ref.hpp>
+#include <iostream>
+
+namespace LBind
 {
-public:
-	Object(lua_State * state, int index);
-	Object();
+	//This ensures the state of the stack.
+	struct StackCheck
+	{
+		StackCheck(lua_State * s, int popped, int netdiff);
+		~StackCheck();
 
-	int index() const;
-	lua_State * state() const;
-private:
-	lua_State * referencingState;
-	int ind;
-};
+		lua_State * s;
+		int consumed;
+		int provided;
+		int previousAmount;
+	};
+
+	/*
+		This exposes two different forms of object, Object and StackObject.
+		When using a StackObject, all operations between Object::push and Object::pop
+		must leave the stack below the first call to Object::push untouched.
+
+		Object has no such stack limitations, but is more expensive (it may touch the
+		registry on each operation) as a result. For performance reasons, use
+		StackObject whenever possible.
+	*/
+
+	class Object;
+	namespace Detail
+	{
+		template<typename T, typename O>
+		class ObjectProxy;
+
+		class Iterator;
+		class StackIterator;
+	}
+
+	//Basically an object, but is on the stack.
+	class StackObject
+	{
+		friend class Detail::ObjectProxy<int, StackObject>;
+		friend class Detail::ObjectProxy<boost::string_ref, StackObject>;
+	public:
+		StackObject(lua_State * interpreter, int index);
+		typedef Detail::StackIterator iterator;
+
+		//Upon construction, this object must be at the top of the stack.
+		Detail::ObjectProxy<int, StackObject> operator[](int i);
+		Detail::ObjectProxy<boost::string_ref, StackObject> operator[](boost::string_ref k);
+
+		int type() const;
+		int index() const;
+		lua_State * state() const;
+
+		iterator begin();
+		iterator end();
+	private:
+		int stackPush(int i) const;
+		int stackPush(boost::string_ref i) const;
+
+		template<typename T>
+		void stackSet(int key, const T& t)
+		{
+			Convert<T>::to(interpreter, t);
+
+			lua_seti(interpreter, canonical, key);
+		}
+
+		template<typename T>
+		void stackSet(boost::string_ref key, const T& t)
+		{
+			Convert<T>::to(interpreter, t);
+
+			//Kinda bad form.
+			assert(key[key.size()] == 0);
+			lua_setfield(interpreter, canonical, key.data());
+		}
+
+		lua_State * interpreter;
+		int canonical;
+	};
+
+	//TODO: THIS LEAKS REFERENCES.
+	//TODO: CALL
+	class Object
+	{
+		friend class Detail::ObjectProxy<int, Object>;
+		friend class Detail::ObjectProxy<boost::string_ref, Object>;
+	public:
+		static Object fromStack(lua_State * state, int ind);
+
+		typedef Detail::Iterator iterator;
+
+		Object(lua_State * state, int index);
+		Object();
+
+		//Pushes this object onto the stack.
+		StackObject push();
+		void pop(StackObject&);
+
+		Detail::ObjectProxy<int, Object> operator[](int i);
+		Detail::ObjectProxy<boost::string_ref, Object> operator[](boost::string_ref k);
+
+		int type() const;
+		int index() const;
+		lua_State * state() const;
+
+		iterator begin();
+		iterator end();
+	private:
+		int stackPush(int i) const;
+		int stackPush(boost::string_ref i) const;
+
+		template<typename T>
+		void stackSet(int key, const T& t)
+		{
+			lua_rawgeti(interpreter, LUA_REGISTRYINDEX, ind);
+			Convert<T>::to(interpreter, t);
+
+			lua_seti(interpreter, -2, key);
+			lua_pop(interpreter, 1);
+		}
+
+		template<typename T>
+		void stackSet(boost::string_ref key, const T& t)
+		{
+			lua_rawgeti(interpreter, LUA_REGISTRYINDEX, ind);
+			Convert<T>::to(interpreter, t);
+
+			//Kinda bad form.
+			assert(key[key.size()] == 0);
+			lua_setfield(interpreter, -2, key.data());
+			lua_pop(interpreter, 1);
+		}
+
+		lua_State * interpreter;
+		int ind;
+	};
+
+	template<>
+	struct Convert<Object, void>
+	{
+		typedef Object type;
+
+		static Object&& forward(type&& t)
+		{
+			return std::move(t);
+		}
+
+		static int from(lua_State * state, int index, type& out)
+		{
+			out = Object::fromStack(state, index);
+			return 1;
+		}
+
+		static int to(lua_State * state, const type& in)
+		{
+			assert(state = in.state());
+			lua_rawgeti(state, LUA_REGISTRYINDEX, in.index());
+			return 1;
+		}
+	};
+
+	template<typename T>
+	T indexCast(lua_State * s, int i)
+	{
+		T result;
+		Convert<T>::from(s, i, result);
+		return std::move(result);
+	}
+
+	template<typename T>
+	T cast(const Object& o)
+	{
+		StackCheck check(o.state(), 1, 0);
+
+		Convert<Object>::to(o.state(), o);
+		return indexCast<T>(o.state(), -1);
+	}
+
+	template<typename T>
+	T cast(const StackObject& o)
+	{
+		return indexCast<T>(o.state(), o.index());
+	}
+
+	namespace Detail
+	{
+		template<typename T, typename Obj>
+		class ObjectProxy
+		{
+		public:
+			ObjectProxy(Obj * obj, T key)
+				:key(key)
+				,object(obj)
+			{}
+
+			template<typename U>
+			operator U() const
+			{
+				StackCheck check(object->state(), 2, 0);
+
+				int type = object->stackPush(key);
+				return indexCast<U>(object->state(), -1);
+			}
+
+			template<typename U>
+			ObjectProxy& operator=(const U& u)
+			{
+				StackCheck check(object->state(), 0, 0);
+				object->stackSet(key, u);
+
+				return *this;
+			}
+		private:
+			T key;
+			Obj * object;
+		};
+
+		class Iterator
+		{
+		public:
+			explicit Iterator(Object * o);
+			Iterator();
+
+			Iterator& operator++();
+			Iterator operator++(int);
+
+			Object operator*();
+			Object key();
+
+			bool operator==(const Iterator& other);
+			bool operator!=(const Iterator& other);
+		private:
+			Object * o;
+
+			Object currentIndex;
+			Object value;
+			int hasNext;
+			int increments;
+		};
+
+		class StackIterator
+		{
+		public:
+			explicit StackIterator(StackObject * o);
+			StackIterator();
+
+			StackIterator& operator++();
+			StackIterator operator++(int);
+
+			StackObject operator*();
+			StackObject key();
+
+			bool operator==(const StackIterator& other);
+			bool operator!=(const StackIterator& other);
+		private:
+			StackObject * o;
+
+			int currentIndex;
+			int value;
+			int hasNext;
+			int increments;
+		};
+	}
+
+	Object newtable(lua_State * state);
+	Object globals(lua_State * state);
+}
