@@ -99,6 +99,11 @@ namespace LBind
 		return Detail::Iterator();
 	}
 
+	StackObject StackObject::fromStack(lua_State * s, int i)
+	{
+		return StackObject(s, i);
+	}
+
 	StackObject::StackObject(lua_State * state, int ind)
 		:interpreter(state)
 		,canonical(lua_absindex(state, ind))
@@ -124,6 +129,17 @@ namespace LBind
 	Detail::ObjectProxy<boost::string_ref, StackObject> StackObject::operator[](boost::string_ref i)
 	{
 		return Detail::ObjectProxy<boost::string_ref, StackObject>(this, i);
+	}
+
+	StackObject StackObject::push()
+	{
+		lua_pushvalue(interpreter, canonical);
+		return StackObject(interpreter, -1);
+	}
+
+	void StackObject::pop(StackObject&)
+	{
+		lua_remove(interpreter, canonical);
 	}
 
 	int StackObject::type() const
@@ -252,13 +268,16 @@ namespace LBind
 		{
 			if (value)
 			{
-				//Pop value, keep key
-				lua_pop(o->state(), 1);
+				//Pop value and fake key, keep key
+				lua_pop(o->state(), 2);
 			}
 
 			hasNext = lua_next(o->state(), o->index());
-			currentIndex = lua_absindex(o->state(), -2);
-			value = lua_absindex(o->state(), -1);
+
+			//Make a copy of the key, in case we call key() and cast to string.
+			lua_pushvalue(o->state(), -2);
+			currentIndex = lua_absindex(o->state(), -1);
+			value = lua_absindex(o->state(), -2);
 
 			increments++;
 

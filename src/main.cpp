@@ -106,15 +106,8 @@ int main(int argc, char * argv[])
 	LBind::Object obj = LBind::newtable(state);
 	LBind::StackObject stack = obj.push();
 
-	stack[1] = 1.5;
-	stack[2] = 1.5;
-	stack[3] = 1.5;
-	stack[4] = 1.5;
-
-	for (auto it = stack.begin(); it != stack.end(); ++it)
-	{
-		std::cout << LBind::cast<int>(it.key()) << " : " << LBind::cast<float>(*it) << "\n";
-	}
+	stack["kitty"] = 2.5;
+	stack["dog"] = stack["kitty"];
 
 	obj.pop(stack);
 

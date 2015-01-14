@@ -45,12 +45,18 @@ namespace LBind
 		friend class Detail::ObjectProxy<int, StackObject>;
 		friend class Detail::ObjectProxy<boost::string_ref, StackObject>;
 	public:
+		static StackObject fromStack(lua_State * state, int ind);
+
 		StackObject(lua_State * interpreter, int index);
 		typedef Detail::StackIterator iterator;
 
 		//Upon construction, this object must be at the top of the stack.
 		Detail::ObjectProxy<int, StackObject> operator[](int i);
 		Detail::ObjectProxy<boost::string_ref, StackObject> operator[](boost::string_ref k);
+
+		//Pushes this object onto the stack
+		StackObject push();
+		void pop(StackObject&);
 
 		int type() const;
 		int index() const;
@@ -165,6 +171,25 @@ namespace LBind
 		}
 	};
 
+	template<>
+	struct Convert<StackObject, void>
+	{
+		//Cannot use this as an argument to a function, so we're missing the type and forward calls.
+
+		static int from(lua_State * state, int index, StackObject& out)
+		{
+			out = StackObject::fromStack(state, index);
+			return 1;
+		}
+
+		static int to(lua_State * state, const StackObject& in)
+		{
+			assert(state = in.state());
+			lua_pushvalue(state, in.index());
+			return 1;
+		}
+	};
+
 	template<typename T>
 	T indexCast(lua_State * s, int i)
 	{
@@ -199,7 +224,7 @@ namespace LBind
 				,object(obj)
 			{}
 
-			template<typename U>
+			template<typename U, typename Enable = typename boost::disable_if<boost::is_same<U, StackObject>, void>::type>
 			operator U() const
 			{
 				StackCheck check(object->state(), 2, 0);
@@ -208,12 +233,31 @@ namespace LBind
 				return indexCast<U>(object->state(), -1);
 			}
 
+			operator Object() const
+			{
+				StackCheck check(object->state(), 1, 0);
+				object->stackPush(key);
+				return Object::fromStack(object->state(), -1);
+			}
+
 			template<typename U>
-			ObjectProxy& operator=(const U& u)
+			typename boost::disable_if<
+				boost::is_same<U, StackObject>,
+				ObjectProxy&>::type
+			operator=(const U& u)
 			{
 				StackCheck check(object->state(), 0, 0);
 				object->stackSet(key, u);
 
+				return *this;
+			}
+
+			ObjectProxy& operator=(const ObjectProxy& other)
+			{
+				StackCheck check(object->state(), 1, 0);
+				other.object->stackPush(other.key);
+
+				object->stackSet(key, StackObject(other.object->state(), -1));
 				return *this;
 			}
 		private:
@@ -270,4 +314,26 @@ namespace LBind
 
 	Object newtable(lua_State * state);
 	Object globals(lua_State * state);
+
+	//A wrapper around pcall. A more friendly intercvaf
+	template<typename Ret, typename ArgVector>
+	Ret protectedCall(Object o, const ArgVector& a)
+	{
+		StackCheck check(o.state(), 1, 0);
+		StackObject pushed = o.push();
+
+		return protectedCall(pushed, a);
+	}
+
+	template<typename Ret, typename ArgVector>
+	Ret protectedCall(StackObject o, const ArgVector& a)
+	{
+		//Push Function
+		lua_pushvalue(o.state(), o.index());
+
+		//Push arguments
+
+
+		//pcall
+	}
 }
