@@ -30,9 +30,14 @@ namespace LBind
 			mutable bool failed;
 		};
 
+		struct OverloadedFunction;
 		struct FunctionBase
 		{
 			virtual int call(lua_State * state) = 0;
+			virtual OverloadedFunction * toOverloaded()
+			{
+				return nullptr;
+			}
 
 			static int apply(lua_State * l)
 			{
@@ -133,6 +138,31 @@ namespace LBind
 			F callable;
 		};
 
+		struct OverloadedFunction : public FunctionBase
+		{
+			OverloadedFunction * toOverloaded()
+			{
+				return this;
+			}
+
+			int call(lua_State * state)
+			{
+				for (size_t i = 0; i < canidates.size(); ++i)
+				{
+					int res = canidates[i]->call(state);
+					if (res >= 0)
+					{
+						return res;
+					}
+				}
+
+				//No valid overloads found!
+				return -1;
+			}
+
+			std::vector<FunctionBase *> canidates;
+		};
+
 		template<typename F>
 		FunctionBase * createFunction(F f)
 		{
@@ -150,6 +180,12 @@ namespace LBind
 	{
 		using namespace Detail;
 		Detail::FunctionBase * base = createFunction(f);
+
+		//Does this function already exist?
+			//If so, is the function overloaded already?
+				//If so, just add a new overload.
+			//Alright, make an overloaded function and add the original function and the to-be-registered one in
+		//Alright, just create a new one
 
 		lua_pushlightuserdata(state, base);
 		lua_pushcclosure(state, &FunctionBase::apply, 1);
