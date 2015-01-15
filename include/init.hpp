@@ -4,4 +4,6 @@
 namespace LBind
 {
 	void open(lua_State *);
+
+	void close(lua_State *);
 }

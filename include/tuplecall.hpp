@@ -3,6 +3,8 @@
 #include "traits.hpp"
 #include "convert.hpp"
 
+#include <iostream>
+
 namespace LBind
 {
 	template<typename F, int arity, bool isMember>
@@ -60,7 +62,102 @@ namespace LBind
 
 #define BOOST_PP_LOCAL_LIMITS (1, 10)
 #include BOOST_PP_LOCAL_ITERATE()
+
+//Also define the C++ -> lua call interface
+	namespace Detail
+	{
+		int pcallWrapper(lua_State * s, int nargs, int nresult, int msg)
+		{
+			int res = lua_pcall(s, nargs, nresult, msg);
+			if (res == 0)
+			{
+				return 0;
+			}
+
+			const char * err = lua_tostring(s, -1);
+			std::cout << err << "\n";
+			return res;
+		}
+	}
+
+	//These return 0 values.
+	template<typename Ret, bool isVoid>
+	struct LuaCall
+	{};
+
+#define CONVERT(z, n, d) \
+	LBind::Convert<typename Undecorate<BOOST_PP_CAT(T, n)>::type>::to(o.state(), BOOST_PP_CAT(t, n));
+
+#define BOOST_PP_LOCAL_MACRO(n) \
+	template<BOOST_PP_ENUM_PARAMS(n, typename T)> 						\
+	static R invoke(Object o, BOOST_PP_ENUM_BINARY_PARAMS(n, T, &&t))	\
+	{																	\
+		StackCheck check(o.state(), 0, 0);								\
+		o.push();														\
+		BOOST_PP_REPEAT(n, CONVERT, 0)									\
+		Detail::pcallWrapper(o.state(), n, 0, 0);						\
+	}
+
+	template<typename R>
+	struct LuaCall<R, true>
+	{
+		static R invoke(Object o)
+		{
+			StackCheck check(o.state(), 0, 0);
+			o.push();
+			Detail::pcallWrapper(o.state(), 0, 0, 0);
+		}
+
+#define BOOST_PP_LOCAL_LIMITS (1, 10)
+#include BOOST_PP_LOCAL_ITERATE()
+	};
+
+#define BOOST_PP_LOCAL_MACRO(n) \
+	template<BOOST_PP_ENUM_PARAMS(n, typename T)> 						\
+	static R invoke(Object o, BOOST_PP_ENUM_BINARY_PARAMS(n, T, &&t))	\
+	{																	\
+		StackCheck check(o.state(), 1, 0);								\
+		o.push();														\
+		BOOST_PP_REPEAT(n, CONVERT, 0)									\
+		Detail::pcallWrapper(o.state(), n, 1, 0);						\
+		R res;															\
+		Convert<R>::from(o.state(), -1, res);							\
+		return res;														\
+	}
+
+	template<typename R>
+	struct LuaCall<R, false>
+	{
+		static R invoke(Object o)
+		{
+			StackCheck check(o.state(), 1, 0);
+			o.push();
+			Detail::pcallWrapper(o.state(), 0, 1, 0);
+			R res;
+			return Convert<R>::from(o.state(), -1, res);
+		}
+
+#define BOOST_PP_LOCAL_LIMITS (1, 10)
+#include BOOST_PP_LOCAL_ITERATE()
+	};
+
+#define BOOST_PP_LOCAL_MACRO(n) \
+	template<typename R BOOST_PP_COMMA_IF(n) BOOST_PP_ENUM_PARAMS(n, typename T)> \
+	R call(Object o BOOST_PP_COMMA_IF(n) BOOST_PP_ENUM_BINARY_PARAMS(n, T, &&t)) { return LuaCall<R, boost::is_same<R, void>::value>::invoke(o BOOST_PP_COMMA_IF(n) BOOST_PP_ENUM_PARAMS(n, t)); }
+
+#define BOOST_PP_LOCAL_LIMITS (0, 10)
+#include BOOST_PP_LOCAL_ITERATE()
+
+#define FORWARD(z, n, d) \
+	std::forward<BOOST_PP_CAT(A, n)>(BOOST_PP_CAT(a, n))
+
+	//Constructor
+#define BOOST_PP_LOCAL_MACRO(n) \
+	template<typename T BOOST_PP_COMMA_IF(n) BOOST_PP_ENUM_PARAMS(n, typename A)> T * constructor(BOOST_PP_ENUM_BINARY_PARAMS(n, A, &&a)) { return new T(BOOST_PP_REPEAT(n, FORWARD, 0)); }
+
 #undef BOOST_PP_LOCAL_MACRO
 #undef BOOST_PP_LOCAL_LIMITS
 #undef FORWARD_ARGS
+#undef CONVERT
+#undef FORWARD
 }

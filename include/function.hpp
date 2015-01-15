@@ -1,4 +1,5 @@
 #pragma once
+#include <vector>
 
 namespace LBind
 {
@@ -47,6 +48,7 @@ namespace LBind
 				int result = b->call(l);
 				if (result < 0)
 				{
+					std::cout << "Error callng function!!\n";
 					//TODO: HANDLE ERROR
 				}
 
@@ -176,7 +178,7 @@ namespace LBind
 	}
 
 	template<typename F>
-	void registerFunction(lua_State * state, const char * name, F f)
+	void pushFunction(lua_State * state, const char * name, F f)
 	{
 		using namespace Detail;
 		Detail::FunctionBase * base = createFunction(f);
@@ -189,6 +191,12 @@ namespace LBind
 
 		lua_pushlightuserdata(state, base);
 		lua_pushcclosure(state, &FunctionBase::apply, 1);
+	}
+
+	template<typename F>
+	void registerFunction(lua_State * state, const char * name, F f)
+	{
+		pushFunction(state, name, f);
 		lua_setglobal(state, name);
 	}
 }

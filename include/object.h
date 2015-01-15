@@ -227,7 +227,8 @@ namespace LBind
 			template<typename U, typename Enable = typename boost::disable_if<boost::is_same<U, StackObject>, void>::type>
 			operator U() const
 			{
-				StackCheck check(object->state(), 2, 0);
+				int pop = boost::is_same<Obj, StackObject>::value ? 1 : 2;
+				StackCheck check(object->state(), pop, 0);
 
 				int type = object->stackPush(key);
 				return indexCast<U>(object->state(), -1);
@@ -235,7 +236,9 @@ namespace LBind
 
 			operator Object() const
 			{
-				StackCheck check(object->state(), 1, 0);
+				int pop = boost::is_same<Obj, StackObject>::value ? 1 : 2;
+
+				StackCheck check(object->state(), pop, 0);
 				object->stackPush(key);
 				return Object::fromStack(object->state(), -1);
 			}
@@ -254,7 +257,8 @@ namespace LBind
 
 			ObjectProxy& operator=(const ObjectProxy& other)
 			{
-				StackCheck check(object->state(), 1, 0);
+				int pop = boost::is_same<Obj, StackObject>::value ? 1 : 2;
+				StackCheck check(object->state(), pop, 0);
 				other.object->stackPush(other.key);
 
 				object->stackSet(key, StackObject(other.object->state(), -1));
