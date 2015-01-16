@@ -309,7 +309,7 @@ namespace LBind
 	Object newtable(lua_State * state);
 	Object globals(lua_State * state);
 
-	//A wrapper around pcall. A more friendly intercvaf
+	//A wrapper around pcall.
 	template<typename Ret, typename ArgVector>
 	Ret protectedCall(Object o, const ArgVector& a)
 	{
@@ -322,12 +322,6 @@ namespace LBind
 	template<typename Ret, typename ArgVector>
 	Ret protectedCall(StackObject o, const ArgVector& a)
 	{
-		//Push Function
-		lua_pushvalue(o.state(), o.index());
-
-		//Push arguments
-
-
-		//pcall
+		return protectedCall(o, a);
 	}
 }

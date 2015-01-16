@@ -1,6 +1,7 @@
 #pragma once
 #include <boost/fusion/include/at_c.hpp>
 #include <boost/preprocessor/iteration/local.hpp>
+#include <boost/optional.hpp>
 #include "traits.hpp"
 #include "convert.hpp"
 
@@ -145,6 +146,28 @@ namespace LBind
 #define BOOST_PP_LOCAL_MACRO(n) \
 	template<typename R BOOST_PP_COMMA_IF(n) BOOST_PP_ENUM_PARAMS(n, typename T)> \
 	R call(Object o BOOST_PP_COMMA_IF(n) BOOST_PP_ENUM_BINARY_PARAMS(n, T, &&t)) { return LuaCall<R, boost::is_same<R, void>::value>::invoke(o BOOST_PP_COMMA_IF(n) BOOST_PP_ENUM_PARAMS(n, t)); }
+
+#define BOOST_PP_LOCAL_LIMITS (0, 10)
+#include BOOST_PP_LOCAL_ITERATE()
+
+#define BOOST_PP_LOCAL_MACRO(n) \
+	template<typename R BOOST_PP_COMMA_IF(n) BOOST_PP_ENUM_PARAMS(n, typename T), typename Enable = typename boost::disable_if<boost::is_same<R, void>>::type> \
+	boost::optional<R> conditionalCall(Object o BOOST_PP_COMMA_IF(n) BOOST_PP_ENUM_BINARY_PARAMS(n, T, &&t)) \
+	{ 																	\
+		if (o.type() != LUA_TFUNCTION) { return boost::none; }			\
+		return LuaCall<R, boost::is_same<R, void>::value>::invoke(o BOOST_PP_COMMA_IF(n) BOOST_PP_ENUM_PARAMS(n, t)); \
+	}
+
+#define BOOST_PP_LOCAL_LIMITS (0, 10)
+#include BOOST_PP_LOCAL_ITERATE()
+
+#define BOOST_PP_LOCAL_MACRO(n) \
+template<typename R BOOST_PP_COMMA_IF(n) BOOST_PP_ENUM_PARAMS(n, typename T), typename Enable = typename boost::enable_if<boost::is_same<R, void>>::type> \
+void conditionalCall(Object o BOOST_PP_COMMA_IF(n) BOOST_PP_ENUM_BINARY_PARAMS(n, T, &&t)) \
+{ 																	\
+	if (o.type() != LUA_TFUNCTION) { return; }						\
+	return LuaCall<R, boost::is_same<R, void>::value>::invoke(o BOOST_PP_COMMA_IF(n) BOOST_PP_ENUM_PARAMS(n, t)); \
+}
 
 #define BOOST_PP_LOCAL_LIMITS (0, 10)
 #include BOOST_PP_LOCAL_ITERATE()

@@ -187,7 +187,7 @@ namespace LBind
 			template<typename U>
 			ClassRegistrar& constant(U t, const char * name)
 			{
-				assert(Convert<U>::is_primitive::value);
+				BOOST_STATIC_ASSERT(Convert<U>::is_primitive::value);
 
 				assert(metatable.index() == lua_gettop(state));
 				Convert<U>::to(state, t);
@@ -200,6 +200,7 @@ namespace LBind
 			template<typename F>
 			ClassRegistrar& def(F f, const char * name)
 			{
+				BOOST_STATIC_ASSERT(boost::is_member_function_pointer<F>::value);
 				assert(metatable.index() == lua_gettop(state));
 
 				LBind::pushFunction(state, name, f);
@@ -209,10 +210,11 @@ namespace LBind
 				return *this;
 			}
 
-			//This is a member function pointer.
+			//This is a member pointer.
 			template<typename M>
 			ClassRegistrar& def_readonly(M m, const char * name)
 			{
+				BOOST_STATIC_ASSERT(boost::is_member_object_pointer<M>::value);
 				assert(metatable.index() == lua_gettop(state));
 
 				MemberBase * member = new ReadonlyMember<T, M>(m);
@@ -223,10 +225,11 @@ namespace LBind
 				return *this;
 			}
 
-			//This is a member function pointer.
+			//This is a member pointer.
 			template<typename M>
 			ClassRegistrar& def_readwrite(M m, const char * name)
 			{
+				BOOST_STATIC_ASSERT(boost::is_member_object_pointer<M>::value);
 				assert(metatable.index() == lua_gettop(state));
 
 				MemberBase * member = new ReadWriteMember<T, M>(m);
