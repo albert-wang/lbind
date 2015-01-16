@@ -1,5 +1,23 @@
 #pragma once
+#include <boost/function_types/result_type.hpp>
+#include <boost/function_types/components.hpp>
+#include <boost/function_types/parameter_types.hpp>
+#include <boost/function_types/function_arity.hpp>
+#include <boost/function_types/is_member_function_pointer.hpp>
+
+#include <boost/mpl/for_each.hpp>
+#include <boost/mpl/begin_end.hpp>
+#include <boost/mpl/next_prior.hpp>
+
+#include <boost/utility/string_ref.hpp>
+
+#include <boost/fusion/include/generation.hpp>
+#include <boost/fusion/include/for_each.hpp>
+#include <boost/fusion/include/at_c.hpp>
+
 #include <vector>
+
+#include "tuplecall.hpp"
 
 namespace LBind
 {

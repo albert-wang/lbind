@@ -1,3 +1,4 @@
+#pragma once
 #include <boost/fusion/include/at_c.hpp>
 #include <boost/preprocessor/iteration/local.hpp>
 #include "traits.hpp"
@@ -66,7 +67,7 @@ namespace LBind
 //Also define the C++ -> lua call interface
 	namespace Detail
 	{
-		int pcallWrapper(lua_State * s, int nargs, int nresult, int msg)
+		inline int pcallWrapper(lua_State * s, int nargs, int nresult, int msg)
 		{
 			int res = lua_pcall(s, nargs, nresult, msg);
 			if (res == 0)

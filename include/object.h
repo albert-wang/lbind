@@ -1,24 +1,13 @@
 #pragma once
 #include "lua.hpp"
 #include "convert.hpp"
+#include "stackcheck.hpp"
 
 #include <boost/utility/string_ref.hpp>
 #include <iostream>
 
 namespace LBind
 {
-	//This ensures the state of the stack.
-	struct StackCheck
-	{
-		StackCheck(lua_State * s, int popped, int netdiff);
-		~StackCheck();
-
-		lua_State * s;
-		int consumed;
-		int provided;
-		int previousAmount;
-	};
-
 	/*
 		This exposes two different forms of object, Object and StackObject.
 		When using a StackObject, all operations between Object::push and Object::pop

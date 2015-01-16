@@ -13,8 +13,8 @@ end
 pt(a)
 a = 6.3;
 
-pt(__classes.Foo)
-
-print(foo);
 foo:bar("Nyan", 2);
-foo.ind = 1;
+
+print(foo.a);
+foo.a = 1;
+foo:bar("!", 3);

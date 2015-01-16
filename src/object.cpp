@@ -2,30 +2,6 @@
 
 namespace LBind
 {
-	StackCheck::StackCheck(lua_State * l, int consumed, int provided)
-		:s(l)
-		,consumed(consumed)
-		,provided(provided)
-		,previousAmount(0)
-	{
-		previousAmount = lua_gettop(l);
-	}
-
-	StackCheck::~StackCheck()
-	{
-		if (consumed != 0)
-		{
-			lua_pop(s, consumed);
-		}
-
-		int now = lua_gettop(s);
-		if (now != (previousAmount + provided))
-		{
-			std::cout << "Stack error: started at " << previousAmount << ", popped: " << consumed << " and expected: " << previousAmount + provided << ", had " << now << "\n";
-			assert(now == (previousAmount + provided));
-		}
-	}
-
 	Object::Object(lua_State * state, int index)
 		:interpreter(state)
 		,ind(index)
