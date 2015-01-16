@@ -140,6 +140,7 @@ namespace LBind
 	struct Convert<Object, void>
 	{
 		typedef Object type;
+		typedef boost::mpl::false_type primitive;
 
 		static Object&& forward(type&& t)
 		{

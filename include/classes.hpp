@@ -9,7 +9,7 @@ namespace LBind
 	namespace Detail
 	{
 		template<typename T>
-		struct MetatableName
+		struct Metatables
 		{
 			static const char * name;
 			static int instanceMetatableIndex;
@@ -17,18 +17,20 @@ namespace LBind
 		};
 
 		template<typename T>
-		const char * MetatableName<T>::name = nullptr;
+		const char * Metatables<T>::name = nullptr;
 
 		template<typename T>
-		int MetatableName<T>::instanceMetatableIndex = 0;
+		int Metatables<T>::instanceMetatableIndex = 0;
 
 		template<typename T>
-		int MetatableName<T>::staticMetatableIndex = 0;
+		int Metatables<T>::staticMetatableIndex = 0;
 
+		//Basically a runtime version of Metatables
 		struct ClassRepresentation
 		{
 			const int * instanceIndex;
 			const int * staticIndex;
+			const char * name;
 		};
 
 		struct MemberBase
@@ -182,6 +184,15 @@ namespace LBind
 				,representation(rep)
 			{}
 
+			template<typename T>
+			ClassRegistrar& constant(T t, const char * name, typename boost::enable_if<Convert<T>::is_primitive>::type * v = nullptr)
+			{
+				assert(metatable.index() == lua_gettop(state));
+				Convert<T>::to(state, t);
+				lua_setfield(state, -2, name);
+				assert(metatable.index() == lua_gettop(state));
+			}
+
 			template<typename F>
 			ClassRegistrar& def(F f, const char * name)
 			{
@@ -227,8 +238,8 @@ namespace LBind
 				using namespace LBind::Detail;
 				assert(metatable.index() == lua_gettop(state));
 
-				MetatableName<T>::instanceMetatableIndex = luaL_ref(state, LUA_REGISTRYINDEX);
-				lua_rawgeti(state, LUA_REGISTRYINDEX, MetatableName<T>::instanceMetatableIndex);
+				Metatables<T>::instanceMetatableIndex = luaL_ref(state, LUA_REGISTRYINDEX);
+				lua_rawgeti(state, LUA_REGISTRYINDEX, Metatables<T>::instanceMetatableIndex);
 
 				lua_pushvalue(state, -1);
 				lua_pushlightuserdata(state, representation);
@@ -239,7 +250,8 @@ namespace LBind
 				lua_pushcclosure(state, &ClassRegistrar<T>::newindex, 1);
 				lua_setfield(state, -2, "__newindex");
 
-				lua_pop(state, 1);
+				//Set this in the current scope as the name of the class.
+				lua_setglobal(state, representation->name);
 			}
 		private:
 			lua_State * state;
@@ -255,6 +267,7 @@ namespace LBind
 
 		//This is what is used to store this value in the argument tuple before pulling the real value from lua.
 		typedef Undecorated type;
+		typedef boost::mpl::false_type is_primitive;
 
 		//Converts the value that we use to store the argument into the actual argument itself.
 		//This will be passed to std::forward<>.
@@ -279,7 +292,7 @@ namespace LBind
 			*val = in;
 
 			//Push the metatable
-			lua_rawgeti(state, LUA_REGISTRYINDEX, LBind::Detail::MetatableName<typename boost::remove_pointer<Undecorated>::type>::instanceMetatableIndex);
+			lua_rawgeti(state, LUA_REGISTRYINDEX, LBind::Detail::Metatables<typename boost::remove_pointer<Undecorated>::type>::instanceMetatableIndex);
 
 			//Set metatable and return.
 			lua_setmetatable(state, -2);
@@ -302,6 +315,7 @@ namespace LBind
 
 		//This is what is used to store this value in the argument tuple before pulling the real value from lua.
 		typedef Undecorated* type;
+		typedef boost::mpl::false_type is_primitive;
 
 		//Converts the value that we use to store the argument into the actual argument itself.
 		//This will be passed to std::forward<>.
@@ -333,7 +347,7 @@ namespace LBind
 			*val = in;
 
 			//Push the metatable
-			lua_rawgeti(state, LUA_REGISTRYINDEX, LBind::Detail::MetatableName<Undecorated>::instanceMetatableIndex);
+			lua_rawgeti(state, LUA_REGISTRYINDEX, LBind::Detail::Metatables<Undecorated>::instanceMetatableIndex);
 
 			//Set metatable and return.
 			lua_setmetatable(state, -2);
@@ -353,10 +367,11 @@ namespace LBind
 		lua_newtable(s);
 
 		Detail::ClassRepresentation * rep = new Detail::ClassRepresentation();
-		rep->instanceIndex = &Detail::MetatableName<T>::instanceMetatableIndex;
-		rep->staticIndex = &Detail::MetatableName<T>::staticMetatableIndex;
+		rep->instanceIndex = &Detail::Metatables<T>::instanceMetatableIndex;
+		rep->staticIndex = &Detail::Metatables<T>::staticMetatableIndex;
+		rep->name = name;
 
-		Detail::MetatableName<T>::name = name;
+		Detail::Metatables<T>::name = name;
 		return Detail::ClassRegistrar<T>(s, LBind::StackObject::fromStack(s, -1), rep);
 	}
 }

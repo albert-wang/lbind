@@ -26,6 +26,7 @@ namespace LBind
 	struct Convert<std::string, void>
 	{
 		typedef std::string type;
+		typedef boost::mpl::true_type is_primitive;
 
 		static std::string&& forward(type&& t)
 		{
@@ -49,6 +50,7 @@ namespace LBind
 	struct Convert<boost::string_ref, void>
 	{
 		typedef std::string type;
+		typedef boost::mpl::true_type is_primitive;
 
 		static boost::string_ref forward(type&& t)
 		{
@@ -72,6 +74,7 @@ namespace LBind
 	struct Convert<T, typename boost::enable_if<boost::is_integral<T>>::type>
 	{
 		typedef int type;
+		typedef boost::mpl::true_type primitive;
 
 		static int forward(type t)
 		{
@@ -99,6 +102,7 @@ namespace LBind
 	struct Convert<T, typename boost::enable_if<boost::is_floating_point<T>>::type>
 	{
 		typedef T type;
+		typedef boost::mpl::true_type is_primitive;
 
 		static T forward(type t)
 		{
