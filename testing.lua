@@ -18,3 +18,5 @@ foo:bar("Nyan", 2);
 print(foo.a);
 foo.a = 1;
 foo:bar("!", 3);
+
+print("Magic: " .. Foo.magic);

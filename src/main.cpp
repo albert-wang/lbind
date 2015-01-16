@@ -86,6 +86,7 @@ int main(int argc, char * argv[])
 */
 
 	LBind::registerClass<Foo>(state, "Foo")
+		.constant(42, "magic")
 		.def(&Foo::bar, "bar")
 		.def_readwrite(&Foo::a, "a")
 		.finish();

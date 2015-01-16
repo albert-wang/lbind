@@ -184,13 +184,17 @@ namespace LBind
 				,representation(rep)
 			{}
 
-			template<typename T>
-			ClassRegistrar& constant(T t, const char * name, typename boost::enable_if<Convert<T>::is_primitive>::type * v = nullptr)
+			template<typename U>
+			ClassRegistrar& constant(U t, const char * name)
 			{
+				assert(Convert<U>::is_primitive::value);
+
 				assert(metatable.index() == lua_gettop(state));
-				Convert<T>::to(state, t);
+				Convert<U>::to(state, t);
 				lua_setfield(state, -2, name);
 				assert(metatable.index() == lua_gettop(state));
+
+				return *this;
 			}
 
 			template<typename F>
@@ -267,7 +271,7 @@ namespace LBind
 
 		//This is what is used to store this value in the argument tuple before pulling the real value from lua.
 		typedef Undecorated type;
-		typedef boost::mpl::false_type is_primitive;
+		typedef boost::false_type is_primitive;
 
 		//Converts the value that we use to store the argument into the actual argument itself.
 		//This will be passed to std::forward<>.
@@ -315,7 +319,7 @@ namespace LBind
 
 		//This is what is used to store this value in the argument tuple before pulling the real value from lua.
 		typedef Undecorated* type;
-		typedef boost::mpl::false_type is_primitive;
+		typedef boost::false_type is_primitive;
 
 		//Converts the value that we use to store the argument into the actual argument itself.
 		//This will be passed to std::forward<>.
