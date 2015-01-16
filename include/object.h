@@ -308,20 +308,4 @@ namespace LBind
 
 	Object newtable(lua_State * state);
 	Object globals(lua_State * state);
-
-	//A wrapper around pcall.
-	template<typename Ret, typename ArgVector>
-	Ret protectedCall(Object o, const ArgVector& a)
-	{
-		StackCheck check(o.state(), 1, 0);
-		StackObject pushed = o.push();
-
-		return protectedCall(pushed, a);
-	}
-
-	template<typename Ret, typename ArgVector>
-	Ret protectedCall(StackObject o, const ArgVector& a)
-	{
-		return protectedCall(o, a);
-	}
 }
