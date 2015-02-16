@@ -63,7 +63,7 @@ void basicz()
 	std::cout << "Zero args \n";
 }
 
-
+#ifndef UNIT_TESTING
 int main(int argc, char * argv[])
 {
 	lua_State * state = luaL_newstate();
@@ -125,3 +125,4 @@ int main(int argc, char * argv[])
 
 	lua_close(state);
 }
+#endif
