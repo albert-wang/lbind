@@ -14,6 +14,7 @@ struct StateFixture
 
 	inline ~StateFixture()
 	{
+		LBind::close(state);
 		lua_close(state);
 	}
 

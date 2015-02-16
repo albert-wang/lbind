@@ -9,6 +9,7 @@
 #include <cassert>
 
 #include <iostream>
+#include "exceptions.hpp"
 
 namespace LBind
 {
@@ -23,6 +24,64 @@ namespace LBind
 	{};
 
 	template<>
+	struct Convert<lua_State, void>
+	{
+		typedef lua_State* type;
+		typedef boost::false_type is_primitive;
+
+		static lua_State *&& forward(type&& t)
+		{
+			return std::move(t);
+		}
+
+		static int from(lua_State * state, int index, type& out)
+		{
+			//Yeah ...
+			out = state;
+
+			//This doesn't consume any stack space.
+			return 0;
+		}
+
+		static int to(lua_State * state, const type& in)
+		{
+			//This isn't a thing. Use a wrapping type instead.
+			throw BadCast("Cannot convert a lua_State into another lua_State. Use a wrapping type instead.");
+		}
+	};
+
+	template<>
+	struct Convert<const char *, void>
+	{
+		typedef const char* type;
+		typedef boost::true_type is_primitive;
+
+		static const char *&& forward(type&& t)
+		{
+			return std::move(t);
+		}
+
+		static int from(lua_State * state, int index, type& out)
+		{
+			const char * res = lua_tostring(state, index);
+			if (!res)
+			{
+				return -1;
+			}
+
+			out = res;
+			return 1;
+		}
+
+		static int to(lua_State * state, const type& in)
+		{
+			lua_pushstring(state, in);
+			return 1;
+		}
+	};
+
+
+	template<>
 	struct Convert<std::string, void>
 	{
 		typedef std::string type;
@@ -35,7 +94,13 @@ namespace LBind
 
 		static int from(lua_State * state, int index, type& out)
 		{
-			out = lua_tostring(state, index);
+			const char * res = lua_tostring(state, index);
+			if (!res)
+			{
+				return -1;
+			}
+
+			out = res;
 			return 1;
 		}
 
@@ -59,7 +124,13 @@ namespace LBind
 
 		static int from(lua_State * state, int index, type& out)
 		{
-			out = lua_tostring(state, index);
+			const char * res = lua_tostring(state, index);
+			if (!res)
+			{
+				return -1;
+			}
+
+			out = res;
 			return 1;
 		}
 
@@ -84,9 +155,25 @@ namespace LBind
 		static int from(lua_State * state, int index, type& out)
 		{
 			int success = 0;
+			auto res = lua_tointegerx(state, index, &success);
 
-			out = static_cast<T>(lua_tointegerx(state, index, &success));
-			assert(success == 1);
+#ifdef CHECK_INTEGER_OVERFLOW
+			if (res > std::numeric_limits<T>::max())
+			{
+				throw BadCast("Integer overflow");
+			}
+
+			if (res < std::numeric_limits<T>::min())
+			{
+				throw BadCast("Integer underflow");
+			}
+#endif
+
+			out = static_cast<T>(res);
+			if (success == 0)
+			{
+				return -1;
+			}
 
 			return 1;
 		}
@@ -114,7 +201,10 @@ namespace LBind
 			int success = 0;
 
 			out = static_cast<T>(lua_tonumberx(state, index, &success));
-			assert(success == 1);
+			if (success == 0)
+			{
+				return -1;
+			}
 
 			return 1;
 		}
@@ -131,5 +221,14 @@ namespace LBind
 	{
 		typedef typename boost::remove_pointer<T>::type type;
 		typedef Convert<type> converter;
+	};
+
+	//Char pointer lookup specialized.
+	//Assumed to be c-string
+	template<>
+	struct Lookup<const char *>
+	{
+		typedef const char * type;
+		typedef Convert<const char *> converter;
 	};
 }

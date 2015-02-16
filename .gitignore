@@ -1,0 +1,6 @@
+*.o
+.deps
+lbind
+unittest
+*.a
+*.swp
