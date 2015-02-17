@@ -317,7 +317,7 @@ namespace LBind
 	}
 
 	template<typename F>
-	void pushFunction(lua_State * state, const char * name, F f)
+	Detail::FunctionBase * pushFunction(lua_State * state, const char * name, F f)
 	{
 		using namespace Detail;
 		Detail::FunctionBase * base = createFunction(f);
@@ -333,12 +333,71 @@ namespace LBind
 
 		InternalState * internal = Detail::getInternalState(state);
 		internal->registerFunction(base);
+
+		return base;
 	}
 
 	template<typename F>
 	void registerFunction(lua_State * state, const char * name, F f)
 	{
-		pushFunction(state, name, f);
-		lua_setglobal(state, name);
+		//TODO - Allow this to be used on arbitrary scopes.
+		//Check to see if we have a function of the same name
+		int type = lua_getglobal(state, name);
+		if (type == LUA_TFUNCTION)
+		{
+			//Assume that its one of ours.
+			const char * upvalueName = lua_getupvalue(state, -1, 1);
+
+			//Stack is [function, upvalue?]
+			if (!upvalueName || upvalueName[0] != '\0')
+			{
+				//Unknown upvalue.
+
+				//This function already exists, do we really want to overwrite?
+				if (upvalueName)
+				{
+					std::cout << "Upvalue found, but had name " << upvalueName << "\n";
+				}
+				else
+				{
+					std::cout << "Upvalue not found\n";
+				}
+			}
+			else
+			{
+				//This may be an overloaded function.
+				Detail::FunctionBase * base = static_cast<Detail::FunctionBase *>(lua_touserdata(state, -1));
+				Detail::OverloadedFunction * overloaded = base->toOverloaded();
+
+				if (!overloaded)
+				{
+					overloaded = new Detail::OverloadedFunction();
+					overloaded->canidates.push_back(base);
+
+					Detail::InternalState * internal = Detail::getInternalState(state);
+					internal->registerFunction(overloaded);
+
+					lua_pushlightuserdata(state, overloaded);
+
+					//Stack is [function, old_upvalue, new_upvalue]
+					lua_setupvalue(state, -3, 1);
+					//Stack is [function, old_upvalue]
+				}
+
+				Detail::FunctionBase * newFunction = pushFunction(state, name, f);
+				lua_pop(state, 1);
+
+				overloaded->canidates.push_back(newFunction);
+			}
+
+			lua_pop(state, 1);
+		}
+		else
+		{
+			lua_pop(state, 1);
+
+			pushFunction(state, name, f);
+			lua_setglobal(state, name);
+		}
 	}
 }

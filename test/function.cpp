@@ -208,3 +208,34 @@ BOOST_AUTO_TEST_CASE(bind_closure_args)
 
 	BOOST_CHECK_EQUAL(count, result);
 }
+
+std::string add_string(const std::string& a, const std::string& b)
+{
+	return a + b;
+}
+
+float add_float(float a, float b)
+{
+	return a + b;
+}
+
+BOOST_AUTO_TEST_CASE(overloaded_functions)
+{
+	StateFixture f;
+
+	LBind::registerFunction(f.state, "add", add_string);
+	LBind::registerFunction(f.state, "add", add_float);
+
+
+	std::string script = "a = add(2, 5); b = add('a', 'b');";
+	BOOST_CHECK(!dostring(f.state, script.c_str()));
+
+	lua_getglobal(f.state, "a");
+	double result = lua_tonumber(f.state, -1);
+
+	lua_getglobal(f.state, "b");
+	std::string strresult = lua_tostring(f.state, -1);
+
+	BOOST_CHECK_EQUAL(result, 7);
+	BOOST_CHECK_EQUAL(strresult, "ab");
+}

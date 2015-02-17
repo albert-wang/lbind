@@ -63,6 +63,11 @@ namespace LBind
 
 		static int from(lua_State * state, int index, type& out)
 		{
+			if (lua_type(state, index) != LUA_TSTRING)
+			{
+				return -1;
+			}
+
 			const char * res = lua_tostring(state, index);
 			if (!res)
 			{
@@ -94,6 +99,11 @@ namespace LBind
 
 		static int from(lua_State * state, int index, type& out)
 		{
+			if (lua_type(state, index) != LUA_TSTRING)
+			{
+				return -1;
+			}
+
 			const char * res = lua_tostring(state, index);
 			if (!res)
 			{
@@ -124,6 +134,11 @@ namespace LBind
 
 		static int from(lua_State * state, int index, type& out)
 		{
+			if (lua_type(state, index) != LUA_TSTRING)
+			{
+				return -1;
+			}
+
 			const char * res = lua_tostring(state, index);
 			if (!res)
 			{
