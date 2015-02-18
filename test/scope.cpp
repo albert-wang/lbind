@@ -20,10 +20,13 @@ namespace
 	{
 		explicit Storage(T t)
 			:stored(t)
-		{}
+		{
+			std::cout << "Created: " << this << "\n";
+		}
 
 		const T& get() const
 		{
+			std::cout << "Read: " << this << "\n";
 			return stored;
 		}
 
@@ -168,6 +171,7 @@ BOOST_AUTO_TEST_CASE(register_class_in_scope)
 
 BOOST_AUTO_TEST_CASE(register_constants)
 {
+	StateFixture f;
 	module(f.state)
 		.scope("ns")
 			.constant("Two", 2)

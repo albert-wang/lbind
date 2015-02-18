@@ -10,6 +10,17 @@ namespace LBind
 
 	namespace Detail
 	{
+		//Ownership semantics are stored in the bottom two bits of non-primitive pointers.
+		enum OwnershipTypes
+		{
+			Unowned = 0x0,
+			Owned   = 0x1
+		};
+
+		void * ownership(void *, boost::uint8_t vals);
+		boost::uint8_t ownership(void *);
+		void * ownershipless(void *);
+
 		template<typename T>
 		struct Metatables
 		{
@@ -99,7 +110,8 @@ namespace LBind
 		{
 			static T * invoke(Ignored*, T0&& v)
 			{
-				return new T(std::forward<T0>(v));
+				T * result = new T(std::forward<T0>(v));
+				return static_cast<T *>(ownership(result, Owned));
 			}
 		};
 
@@ -109,6 +121,19 @@ namespace LBind
 			static int warn(lua_State *)
 			{
 				std::cout << "Newindex called!";
+				return 0;
+			}
+
+			static int collect(lua_State * s)
+			{
+				//Stack is val
+				void * userdata = lua_touserdata(s, -1);
+				if (ownership(userdata) == Owned)
+				{
+					T * val = static_cast<T *>(userdata);
+					delete val;
+				}
+
 				return 0;
 			}
 
@@ -135,7 +160,7 @@ namespace LBind
 				{
 					//A member access.
 					MemberBase * member = static_cast<MemberBase *>(lua_touserdata(s, -1));
-					void * target = *(void **)lua_touserdata(s, -4);
+					void * target = ownershipless(*(void **)lua_touserdata(s, -4));
 
 					member->push(s, target);
 
@@ -173,7 +198,7 @@ namespace LBind
 				if (type == LUA_TLIGHTUSERDATA)
 				{
 					MemberBase * member = static_cast<MemberBase *>(lua_touserdata(s, -1));
-					void * target = *(void **)lua_touserdata(s, -5);
+					void * target = ownershipless(*(void **)lua_touserdata(s, -5));
 
 					lua_pop(s, 2);
 
@@ -346,7 +371,7 @@ namespace LBind
 		//Converts a value at the given index. Must write to out, and return the number of stack objects consumed.
 		static int from(lua_State * state, int index, type& out)
 		{
-			type * block = static_cast<type *>(lua_touserdata(state, index));
+			type * block = static_cast<type *>(Detail::ownershipless(lua_touserdata(state, index)));
 			out = block;
 			return 1;
 		}
@@ -395,7 +420,7 @@ namespace LBind
 		static int from(lua_State * state, int index, type& out)
 		{
 			type * block = static_cast<type *>(lua_touserdata(state, index));
-			out = *block;
+			out = static_cast<type>(Detail::ownershipless(*block));
 			return 1;
 		}
 
@@ -404,6 +429,7 @@ namespace LBind
 		{
 			//Make a copy
 			T * storage = new T(in);
+			storage = static_cast<T *>(Detail::ownership(storage, Detail::Owned));
 			return to(state, storage);
 		}
 
