@@ -6,6 +6,8 @@
 
 namespace LBind
 {
+	class Scope;
+
 	namespace Detail
 	{
 		template<typename T>
@@ -92,6 +94,14 @@ namespace LBind
 			M pointer;
 		};
 
+		template<typename T, typename T0>
+		struct Construct
+		{
+			static T * invoke(Ignored*, T0&& v)
+			{
+				return new T(std::forward<T0>(v));
+			}
+		};
 
 		template<typename T>
 		class ClassRegistrar
@@ -178,33 +188,42 @@ namespace LBind
 				return 0;
 			}
 		public:
-			ClassRegistrar(lua_State * state, LBind::StackObject meta, ClassRepresentation * rep)
+			ClassRegistrar(lua_State * state, LBind::StackObject meta, ClassRepresentation * rep, int scopeIndex, Scope * containingScope)
 				:state(state)
 				,metatable(meta)
 				,representation(rep)
+				,scopeIndex(scopeIndex)
+				,containingScope(containingScope)
 			{}
 
 			template<typename U>
-			ClassRegistrar& constant(U t, const char * name)
+			ClassRegistrar& constant(boost::string_ref name, U t)
 			{
 				BOOST_STATIC_ASSERT(Convert<U>::is_primitive::value);
 
 				assert(metatable.index() == lua_gettop(state));
 				Convert<U>::to(state, t);
-				lua_setfield(state, -2, name);
+				lua_setfield(state, -2, name.data());
 				assert(metatable.index() == lua_gettop(state));
 
 				return *this;
 			}
 
+			//TODO: expand this to many arguments.
+			template<typename T0>
+			ClassRegistrar& constructor()
+			{
+				constructors.push_back(Detail::createFunction(Construct<T, T0>::invoke));
+				return *this;
+			}
+
 			template<typename F>
-			ClassRegistrar& def(F f, const char * name)
+			ClassRegistrar& def(boost::string_ref name, F f)
 			{
 				BOOST_STATIC_ASSERT(boost::is_member_function_pointer<F>::value);
 				assert(metatable.index() == lua_gettop(state));
 
-				LBind::pushFunction(state, name, f);
-				lua_setfield(state, -2, name);
+				resolveFunctionOverloads(state, name.data(), f);
 
 				assert(metatable.index() == lua_gettop(state));
 				return *this;
@@ -212,14 +231,14 @@ namespace LBind
 
 			//This is a member pointer.
 			template<typename M>
-			ClassRegistrar& def_readonly(M m, const char * name)
+			ClassRegistrar& def_readonly(boost::string_ref name, M m)
 			{
 				BOOST_STATIC_ASSERT(boost::is_member_object_pointer<M>::value);
 				assert(metatable.index() == lua_gettop(state));
 
 				MemberBase * member = new ReadonlyMember<T, M>(m);
 				lua_pushlightuserdata(state, member);
-				lua_setfield(state, -2, name);
+				lua_setfield(state, -2, name.data());
 
 				assert(metatable.index() == lua_gettop(state));
 				return *this;
@@ -227,28 +246,29 @@ namespace LBind
 
 			//This is a member pointer.
 			template<typename M>
-			ClassRegistrar& def_readwrite(M m, const char * name)
+			ClassRegistrar& def_readwrite(boost::string_ref name, M m)
 			{
 				BOOST_STATIC_ASSERT(boost::is_member_object_pointer<M>::value);
 				assert(metatable.index() == lua_gettop(state));
 
 				MemberBase * member = new ReadWriteMember<T, M>(m);
 				lua_pushlightuserdata(state, member);
-				lua_setfield(state, -2, name);
+				lua_setfield(state, -2, name.data());
 
 				assert(metatable.index() == lua_gettop(state));
 				return *this;
 			}
 
-			void finish()
+			Scope& endclass()
 			{
+				StackCheck check(state, 1, 0);
+
 				using namespace LBind::Detail;
 				assert(metatable.index() == lua_gettop(state));
 
 				Metatables<T>::instanceMetatableIndex = luaL_ref(state, LUA_REGISTRYINDEX);
 				lua_rawgeti(state, LUA_REGISTRYINDEX, Metatables<T>::instanceMetatableIndex);
 
-				lua_pushvalue(state, -1);
 				lua_pushlightuserdata(state, representation);
 				lua_pushcclosure(state, &ClassRegistrar<T>::index, 1);
 				lua_setfield(state, -2, "__index");
@@ -257,13 +277,49 @@ namespace LBind
 				lua_pushcclosure(state, &ClassRegistrar<T>::newindex, 1);
 				lua_setfield(state, -2, "__newindex");
 
+				//Also we need a metatable for __call for constructors.
+				if (constructors.size())
+				{
+					InternalState * internal = Detail::getInternalState(state);
+
+					FunctionBase * ctor = constructors[0];
+					if (constructors.size() > 1)
+					{
+						OverloadedFunction * f = new OverloadedFunction();
+						f->canidates = constructors;
+						ctor = f;
+
+						internal->registerFunction(f);
+					}
+
+					for (size_t i = 0; i < constructors.size(); ++i)
+					{
+						internal->registerFunction(constructors[i]);
+					}
+
+					lua_newtable(state);
+					lua_pushlightuserdata(state, ctor);
+					lua_pushcclosure(state, &FunctionBase::apply, 1);
+					lua_setfield(state, -2, "__call");
+					lua_setmetatable(state, -2);
+				}
+
 				//Set this in the current scope as the name of the class.
-				lua_setglobal(state, representation->name);
+				lua_rawgeti(state, LUA_REGISTRYINDEX, scopeIndex);
+				lua_pushvalue(state, -2);
+				lua_setfield(state, -2, representation->name);
+
+				return *containingScope;
 			}
 		private:
 			lua_State * state;
 			LBind::StackObject metatable;
 			ClassRepresentation * representation;
+
+			int scopeIndex;
+			Scope * containingScope;
+
+			std::vector<FunctionBase *> constructors;
 		};
 	}
 
@@ -305,7 +361,7 @@ namespace LBind
 			lua_setmetatable(state, -2);
 
 			//Do we have a metatable?
-			return 0;
+			return 1;
 		}
 	};
 
@@ -360,13 +416,13 @@ namespace LBind
 			lua_setmetatable(state, -2);
 
 			//Do we have a metatable?
-			return 0;
+			return 1;
 		}
 	};
 
 
 	template<typename T>
-	Detail::ClassRegistrar<T> registerClass(lua_State * s, const char * name)
+	Detail::ClassRegistrar<T> registerClass(lua_State * s, const char * name, int scopeIndex, Scope * scope)
 	{
 		LBind::StackCheck check(s, 0, 1);
 
@@ -379,6 +435,6 @@ namespace LBind
 		rep->name = name;
 
 		Detail::Metatables<T>::name = name;
-		return Detail::ClassRegistrar<T>(s, LBind::StackObject::fromStack(s, -1), rep);
+		return Detail::ClassRegistrar<T>(s, LBind::StackObject::fromStack(s, -1), rep, scopeIndex, scope);
 	}
 }

@@ -19,9 +19,41 @@ namespace LBind
 		typedef typename boost::remove_cv<typename boost::remove_reference<T>::type>::type type;
 	};
 
+	struct Ignored
+	{
+		Ignored()
+		{
+			throw BindingError("Ignored should never be constructed");
+		}
+	};
+
 	template<typename T, typename Enable = void>
 	struct Convert
 	{};
+
+	template<>
+	struct Convert<Ignored, void>
+	{
+		typedef Ignored* type;
+		typedef boost::true_type is_primitive;
+
+		static Ignored *&& forward(type&& t)
+		{
+			return std::move(t);
+		}
+
+		static int from(lua_State * state, int index, type& out)
+		{
+			out = nullptr;
+			return 1;
+		}
+
+		static int to(lua_State * state, const type& in)
+		{
+			//What? No.
+			throw BadCast("Cannot convert an Ignored parameter into lua.");
+		}
+	};
 
 	template<>
 	struct Convert<lua_State, void>

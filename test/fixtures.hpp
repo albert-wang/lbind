@@ -32,3 +32,8 @@ inline const char * dostring(lua_State * state, const char * data)
 
 	return nullptr;
 }
+
+inline const char * dostring(StateFixture& f, const std::string& n)
+{
+	return dostring(f.state, n.c_str());
+}

@@ -305,7 +305,7 @@ namespace LBind
 
 		//Function overload
 		template<typename F>
-		FunctionBase * createFunction(F f, typename boost::function_types::result_type<F>::type * = nullptr)
+		FunctionBase * createFunction(F f, typename boost::remove_reference<typename boost::function_types::result_type<F>::type>::type * = nullptr)
 		{
 			return new Function<F,
 				boost::is_same<
@@ -337,12 +337,11 @@ namespace LBind
 		return base;
 	}
 
+	//Assumes that a table is on top of the stack.
 	template<typename F>
-	void registerFunction(lua_State * state, const char * name, F f)
+	void resolveFunctionOverloads(lua_State * state, const char * name, F f)
 	{
-		//TODO - Allow this to be used on arbitrary scopes.
-		//Check to see if we have a function of the same name
-		int type = lua_getglobal(state, name);
+		int type = lua_getfield(state, -1, name);
 		if (type == LUA_TFUNCTION)
 		{
 			//Assume that its one of ours.
@@ -366,6 +365,7 @@ namespace LBind
 			else
 			{
 				//This may be an overloaded function.
+				Detail::InternalState * internal = Detail::getInternalState(state);
 				Detail::FunctionBase * base = static_cast<Detail::FunctionBase *>(lua_touserdata(state, -1));
 				Detail::OverloadedFunction * overloaded = base->toOverloaded();
 
@@ -374,7 +374,6 @@ namespace LBind
 					overloaded = new Detail::OverloadedFunction();
 					overloaded->canidates.push_back(base);
 
-					Detail::InternalState * internal = Detail::getInternalState(state);
 					internal->registerFunction(overloaded);
 
 					lua_pushlightuserdata(state, overloaded);
@@ -384,20 +383,31 @@ namespace LBind
 					//Stack is [function, old_upvalue]
 				}
 
-				Detail::FunctionBase * newFunction = pushFunction(state, name, f);
-				lua_pop(state, 1);
+				Detail::FunctionBase * newFunction = Detail::createFunction(f);
+				internal->registerFunction(newFunction);
 
 				overloaded->canidates.push_back(newFunction);
 			}
 
-			lua_pop(state, 1);
+			//Pop function and the table
+			lua_pop(state, 2);
 		}
 		else
 		{
 			lua_pop(state, 1);
 
 			pushFunction(state, name, f);
-			lua_setglobal(state, name);
+			lua_setfield(state, -2, name);
 		}
+	}
+
+	//Assumes the table index is a registry index.
+	template<typename F>
+	void registerFunction(lua_State * state, int tableIndex, const char * name, F f)
+	{
+		StackCheck check(state, 1, 0);
+
+		lua_rawgeti(state, LUA_REGISTRYINDEX, tableIndex);
+		resolveFunctionOverloads(state, name, f);
 	}
 }
