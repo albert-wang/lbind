@@ -277,6 +277,10 @@ namespace LBind
 				lua_pushcclosure(state, &ClassRegistrar<T>::newindex, 1);
 				lua_setfield(state, -2, "__newindex");
 
+				lua_pushlightuserdata(state, representation);
+				lua_pushcclosure(state, &ClassRegistrar<T>::collect, 1);
+				lua_setfield(state, -2, "__gc");
+
 				//Also we need a metatable for __call for constructors.
 				if (constructors.size())
 				{

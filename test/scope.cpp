@@ -165,3 +165,20 @@ BOOST_AUTO_TEST_CASE(register_class_in_scope)
 
 	BOOST_CHECK_EQUAL(v, 42);
 }
+
+BOOST_AUTO_TEST_CASE(register_constants)
+{
+	module(f.state)
+		.scope("ns")
+			.constant("Two", 2)
+			.constant("Twos", "2")
+		.endscope()
+	.end();
+
+	std::string script = "a = ns.Twos";
+	BOOST_CHECK(!dostring(f, script));
+
+	lua_getglobal(f.state, "a");
+	const char * v = lua_tostring(f.state, -1);
+	BOOST_CHECK_EQUAL(v, std::string("2"));
+}
