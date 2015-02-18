@@ -21,12 +21,10 @@ namespace
 		explicit Storage(T t)
 			:stored(t)
 		{
-			std::cout << "Created: " << this << "\n";
 		}
 
 		const T& get() const
 		{
-			std::cout << "Read: " << this << "\n";
 			return stored;
 		}
 

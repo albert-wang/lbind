@@ -117,7 +117,6 @@ namespace LBind
 		}
 	};
 
-
 	template<>
 	struct Convert<std::string, void>
 	{

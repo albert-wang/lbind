@@ -140,7 +140,7 @@ namespace LBind
 	struct Convert<Object, void>
 	{
 		typedef Object type;
-		typedef boost::false_type primitive;
+		typedef boost::false_type is_primitive;
 
 		static Object&& forward(type&& t)
 		{
@@ -164,6 +164,9 @@ namespace LBind
 	template<>
 	struct Convert<StackObject, void>
 	{
+		typedef Object type;
+		typedef boost::false_type is_primitive;
+
 		//Cannot use this as an argument to a function, so we're missing the type and forward calls.
 
 		static int from(lua_State * state, int index, StackObject& out)
@@ -181,7 +184,7 @@ namespace LBind
 	};
 
 	template<typename T>
-	T indexCast(lua_State * s, int i)
+	T indexCast(lua_State * s, int i, typename boost::enable_if<typename Convert<T>::is_primitive>::type * = nullptr)
 	{
 		T result;
 		Convert<T>::from(s, i, result);
@@ -189,16 +192,37 @@ namespace LBind
 	}
 
 	template<typename T>
-	T cast(const Object& o)
+	T& indexCast(lua_State * s, int i, typename boost::disable_if<typename Convert<T>::is_primitive>::type * = nullptr)
+	{
+		T * result = nullptr;
+		Convert<T>::from(s, i, result);
+		return *result;
+	}
+
+	template<typename T>
+	T cast(const Object& o, typename boost::enable_if<typename Convert<T>::is_primitive>::type * = nullptr)
 	{
 		StackCheck check(o.state(), 1, 0);
-
 		Convert<Object>::to(o.state(), o);
 		return indexCast<T>(o.state(), -1);
 	}
 
 	template<typename T>
-	T cast(const StackObject& o)
+	T cast(const StackObject& o, typename boost::enable_if<typename Convert<T>::is_primitive>::type * = nullptr)
+	{
+		return indexCast<T>(o.state(), o.index());
+	}
+
+	template<typename T>
+	T& cast(const Object& o, typename boost::disable_if<typename Convert<T>::is_primitive>::type * = nullptr)
+	{
+		StackCheck check(o.state(), 1, 0);
+		Convert<Object>::to(o.state(), o);
+		return indexCast<T>(o.state(), -1);
+	}
+
+	template<typename T>
+	T& cast(const StackObject& o, typename boost::disable_if<typename Convert<T>::is_primitive>::type * = nullptr)
 	{
 		return indexCast<T>(o.state(), o.index());
 	}
