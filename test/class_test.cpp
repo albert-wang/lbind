@@ -25,6 +25,12 @@ namespace
 		}
 	};
 
+	std::ostream& operator<<(std::ostream& o, const ConstructFixture& f)
+	{
+		o << "C: " << f.constructs << " D: " << f.destructs << " CC: " << f.copies << " M: " << f.moves << " A: " << f.assigns;
+		return o;
+	}
+
 	int ConstructFixture::constructs;
 	int ConstructFixture::destructs;
 	int ConstructFixture::copies;
@@ -51,6 +57,24 @@ namespace
 			ConstructFixture::destructs++;
 		}
 
+		Storage(const Storage& other)
+			:stored(other.stored)
+		{
+			ConstructFixture::copies++;
+		}
+
+		Storage(Storage&& other)
+			:stored(other.stored)
+		{
+			ConstructFixture::moves++;
+		}
+
+		Storage& operator=(const Storage& other)
+		{
+			stored = other.stored;
+			ConstructFixture::assigns++;
+		}
+
 		const T& get() const
 		{
 			return stored;
@@ -61,9 +85,15 @@ namespace
 			stored = other;
 		}
 
-		void add(const T& another) const
+		void add(const T& another)
 		{
 			stored += another;
+		}
+
+		Storage& fluent_add(const T& another)
+		{
+			add(another);
+			return *this;
 		}
 
 		T stored;
@@ -105,7 +135,7 @@ BOOST_AUTO_TEST_CASE(basic_classes)
 	}
 
 	BOOST_CHECK_EQUAL(c.constructs, 1);
-	BOOST_CHECK_EQUAL(c.destructs, 1);
+	BOOST_CHECK_EQUAL(c.destructs, 2);
 }
 
 BOOST_AUTO_TEST_CASE(nested_classes)
@@ -262,16 +292,62 @@ BOOST_AUTO_TEST_CASE(non_member_member_bind_through_reference)
 
 BOOST_AUTO_TEST_CASE(can_call_reference)
 {
-	StateFixture f;
-	module(f.state)
-		.class_<Storage<int>>("Int")
-			.constructor<int>()
-		.endclass()
-		.def("add", external_add_ref<int>)
-	.end();
+	ConstructFixture c;
 
-	std::string script = "a = Int(123); add(a, 2)";
-	BOOST_CHECK(!dostring(f, script));
-	Storage<int> val = cast<Storage<int>>(globals(f.state)["a"]);
-	BOOST_CHECK_EQUAL(val.get(), 125);
+	{
+		StateFixture f;
+		module(f.state)
+			.class_<Storage<int>>("Int")
+				.constructor<int>()
+			.endclass()
+			.def("add", external_add_ref<int>)
+		.end();
+
+		std::string script = "a = Int(123); add(a, 2)";
+		BOOST_CHECK(!dostring(f, script));
+		Storage<int> val = cast<Storage<int>>(globals(f.state)["a"]);
+		BOOST_CHECK_EQUAL(val.get(), 125);
+	}
+
+	BOOST_CHECK_EQUAL(c.copies, 1);
+}
+
+BOOST_AUTO_TEST_CASE(construction_destruction)
+{
+	ConstructFixture c;
+
+	{
+		StateFixture f;
+		module(f.state)
+			.class_<Storage<int>>("Int")
+				.constructor<int>()
+			.endclass()
+		.end();
+
+		std::string script = "a = Int(123);";
+		BOOST_CHECK(!dostring(f, script));
+	}
+
+	BOOST_CHECK_EQUAL(c.constructs, 1);
+	BOOST_CHECK_EQUAL(c.destructs, 1);
+}
+
+BOOST_AUTO_TEST_CASE(returning_self)
+{
+	ConstructFixture c;
+
+	{
+		StateFixture f;
+		module(f.state)
+			.class_<Storage<int>>("Int")
+				.constructor<int>()
+				.def("add", &Storage<int>::fluent_add)
+			.endclass()
+		.end();
+
+		std::string script = "a = Int(123); a:add(4)";
+		BOOST_CHECK(!dostring(f, script));
+	}
+
+	std::cout << c << "\n";
 }

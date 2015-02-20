@@ -195,10 +195,10 @@ namespace LBind
 			static int collect(lua_State * s)
 			{
 				//Stack is val
-				void * userdata = lua_touserdata(s, -1);
+				void * userdata = *(void **)lua_touserdata(s, -1);
 				if (ownership(userdata) == Owned)
 				{
-					T * val = static_cast<T *>(userdata);
+					T * val = static_cast<T *>(ownershipless(userdata));
 					delete val;
 				}
 
