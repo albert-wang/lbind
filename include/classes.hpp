@@ -52,6 +52,74 @@ namespace LBind
 			virtual int set(lua_State * s, void * target) = 0;
 		};
 
+		template<typename T, typename G>
+		struct PropertyReadOnlyMember : public MemberBase
+		{
+			BOOST_STATIC_ASSERT(boost::is_member_function_pointer<G>::value);
+
+			explicit PropertyReadOnlyMember(G getter)
+				:getter(getter)
+			{}
+
+			void push(lua_State * s, void * target)
+			{
+				T * t = static_cast<T *>(target);
+
+				typedef typename FunctionTraits<G>::result_type MemberType;
+				Convert<typename Undecorate<MemberType>::type>::to(s, ((t)->*(getter))());
+			}
+
+			int set(lua_State * s, void * target)
+			{
+				//Error!
+				lua_pushstring(s, "LBind error: Could not set a read-only value");
+				lua_error(s);
+				return 0;
+			}
+
+			G getter;
+		};
+
+		template<typename T, typename G, typename S>
+		struct PropertyMember : public MemberBase
+		{
+			BOOST_STATIC_ASSERT(boost::is_member_function_pointer<G>::value);
+
+			BOOST_STATIC_ASSERT(boost::is_member_function_pointer<S>::value);
+			BOOST_STATIC_ASSERT(boost::function_types::function_arity<S>::value == 2);
+
+			PropertyMember(G getter, S setter)
+				:getter(getter)
+				,setter(setter)
+			{}
+
+			void push(lua_State * s, void * target)
+			{
+				T * t = static_cast<T *>(target);
+
+				typedef typename FunctionTraits<G>::result_type MemberType;
+				Convert<typename Undecorate<MemberType>::type>::to(s, ((t)->*(getter))());
+			}
+
+			int set(lua_State * s, void * target)
+			{
+				T * t = static_cast<T *>(target);
+
+				typedef typename boost::fusion::result_of::at_c<typename FunctionTraits<S>::parameter_types, 1>::type MemberType;
+				typedef Convert<typename Undecorate<MemberType>::type> Converter;
+
+				typename Converter::type value;
+
+				int consumed = Convert<typename Undecorate<MemberType>::type>::from(s, -1, value);
+
+				((t)->*(setter))(value);
+				return consumed;
+			}
+
+			G getter;
+			S setter;
+		};
+
 		template<typename T, typename M>
 		struct ReadonlyMember : public MemberBase
 		{
@@ -97,7 +165,7 @@ namespace LBind
 				typename Converter::type value;
 
 				int consumed = Convert<typename Undecorate<MemberType>::type>::from(s, -1, value);
-				(static_cast<T *>(target)->*(pointer)) = Converter::forward(value);
+				(static_cast<T *>(target)->*(pointer)) = Converter::forward(std::move(value));
 
 				return consumed;
 			}
@@ -245,7 +313,6 @@ namespace LBind
 			template<typename F>
 			ClassRegistrar& def(boost::string_ref name, F f)
 			{
-				BOOST_STATIC_ASSERT(boost::is_member_function_pointer<F>::value);
 				assert(metatable.index() == lua_gettop(state));
 
 				resolveFunctionOverloads(state, name.data(), f);
@@ -281,6 +348,26 @@ namespace LBind
 				lua_setfield(state, -2, name.data());
 
 				assert(metatable.index() == lua_gettop(state));
+				return *this;
+			}
+
+			template<typename G>
+			ClassRegistrar& property(boost::string_ref name, G getter)
+			{
+				MemberBase * member = new PropertyReadOnlyMember<T, G>(getter);
+				lua_pushlightuserdata(state, member);
+				lua_setfield(state, -2, name.data());
+
+				return *this;
+			}
+
+			template<typename G, typename S>
+			ClassRegistrar& property(boost::string_ref name, G getter, S setter)
+			{
+				MemberBase * member = new PropertyMember<T, G, S>(getter, setter);
+				lua_pushlightuserdata(state, member);
+				lua_setfield(state, -2, name.data());
+
 				return *this;
 			}
 
@@ -368,6 +455,12 @@ namespace LBind
 			return std::forward<T>(t);
 		}
 
+		template<typename U>
+		static U&& universal(type&& t)
+		{
+			return static_cast<U&&>(t);
+		}
+
 		//Converts a value at the given index. Must write to out, and return the number of stack objects consumed.
 		static int from(lua_State * state, int index, type& out)
 		{
@@ -411,9 +504,15 @@ namespace LBind
 
 		//Converts the value that we use to store the argument into the actual argument itself.
 		//This will be passed to std::forward<>.
-		static T&& forward(type t)
+		static T& forward(type t)
 		{
-			return std::forward<T>(*t);
+			return *t;
+		}
+
+		template<typename U>
+		static U&& universal(type&& t)
+		{
+			return static_cast<U&&>(*t);
 		}
 
 		//Converts a value at the given index. Must write to out, and return the number of stack objects consumed.

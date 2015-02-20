@@ -42,6 +42,12 @@ namespace LBind
 			return std::move(t);
 		}
 
+		template<typename T>
+		static T&& universal(type&& t)
+		{
+			return std::move(t);
+		}
+
 		static int from(lua_State * state, int index, type& out)
 		{
 			out = nullptr;
@@ -62,6 +68,12 @@ namespace LBind
 		typedef boost::false_type is_primitive;
 
 		static lua_State *&& forward(type&& t)
+		{
+			return std::move(t);
+		}
+
+		template<typename T>
+		static T&& universal(type&& t)
 		{
 			return std::move(t);
 		}
@@ -89,6 +101,12 @@ namespace LBind
 		typedef boost::true_type is_primitive;
 
 		static const char *&& forward(type&& t)
+		{
+			return std::move(t);
+		}
+
+		template<typename T>
+		static T&& universal(type&& t)
 		{
 			return std::move(t);
 		}
@@ -128,6 +146,12 @@ namespace LBind
 			return std::move(t);
 		}
 
+		template<typename T>
+		static T&& universal(type&& t)
+		{
+			return std::move(t);
+		}
+
 		static int from(lua_State * state, int index, type& out)
 		{
 			if (lua_type(state, index) != LUA_TSTRING)
@@ -163,6 +187,12 @@ namespace LBind
 			return t;
 		}
 
+		template<typename T>
+		static T&& universal(type&& t)
+		{
+			return t;
+		}
+
 		static int from(lua_State * state, int index, type& out)
 		{
 			if (lua_type(state, index) != LUA_TSTRING)
@@ -190,12 +220,18 @@ namespace LBind
 	template<typename T>
 	struct Convert<T, typename boost::enable_if<boost::is_integral<T>>::type>
 	{
-		typedef int type;
+		typedef T type;
 		typedef boost::true_type is_primitive;
 
-		static int forward(type t)
+		static T&& forward(type&& t)
 		{
-			return t;
+			return static_cast<T&&>(t);
+		}
+
+		template<typename U>
+		static U&& universal(type&& t)
+		{
+			return static_cast<U&&>(t);
 		}
 
 		static int from(lua_State * state, int index, type& out)
@@ -237,9 +273,15 @@ namespace LBind
 		typedef T type;
 		typedef boost::true_type is_primitive;
 
-		static T forward(type t)
+		static T&& forward(type&& t)
 		{
-			return t;
+			return static_cast<T&&>(t);
+		}
+
+		template<typename U>
+		static U&& universal(type&& t)
+		{
+			return static_cast<U&&>(t);
 		}
 
 		static int from(lua_State * state, int index, type& out)

@@ -24,7 +24,8 @@ namespace LBind
 	};
 
 #define BOOST_PP_LOCAL_LIMITS (1, 10)
-#define FORWARD_ARGS(z, n, d) BOOST_PP_COMMA_IF(BOOST_PP_SUB(n, d)) std::forward<typename boost::remove_reference<typename result_of::at_c<parameter_tuple, n>::type>::type>(Convert<typename boost::remove_cv<typename boost::remove_reference<typename result_of::at_c<parameter_tuple, n>::type>::type>::type>::forward(std::move(at_c<n>(args))))
+#define FORWARD_ARGS(z, n, d) BOOST_PP_COMMA_IF(BOOST_PP_SUB(n, d)) \
+	Convert<typename boost::remove_cv<typename boost::remove_reference<typename result_of::at_c<parameter_tuple, n>::type>::type>::type>::template universal<typename result_of::at_c<parameter_tuple, n>::type>(std::move(at_c<n>(args)))
 
 #define BOOST_PP_LOCAL_MACRO(n) \
 	template<typename F, typename Ret, typename Params>	\

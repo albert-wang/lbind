@@ -1,6 +1,7 @@
 #define BOOST_TEST_NO_MAIN
 #include <boost/test/unit_test.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/fusion/include/at_c.hpp>
 #include "fixtures.hpp"
 #include "binddsl.hpp"
 
@@ -67,6 +68,19 @@ namespace
 
 		T stored;
 	};
+
+
+	template<typename T>
+	void external_add(Storage<T> * val, int n)
+	{
+		val->stored += n;
+	}
+
+	template<typename T>
+	void external_add_ref(Storage<T>& val, int n)
+	{
+		val.stored += n;
+	}
 }
 
 using namespace LBind;
@@ -152,4 +166,112 @@ BOOST_AUTO_TEST_CASE(basic_value)
 	int i = cast<int>(g["val"]);
 
 	BOOST_CHECK_EQUAL(i, 47);
+}
+
+BOOST_AUTO_TEST_CASE(readonly_property)
+{
+	StateFixture f;
+	module(f.state)
+		.class_<Storage<int>>("Int")
+			.constructor<int>()
+			.property("value", &Storage<int>::get)
+		.endclass()
+	.end();
+
+	std::string script = "a = Int(42); b = a.value;";
+	BOOST_CHECK(!dostring(f, script));
+
+	Object g = globals(f.state);
+	int i = cast<int>(g["b"]);
+
+	BOOST_CHECK_EQUAL(i, 42);
+}
+
+BOOST_AUTO_TEST_CASE(full_property)
+{
+	StateFixture f;
+	module(f.state)
+		.class_<Storage<int>>("Int")
+			.constructor<int>()
+			.property("value", &Storage<int>::get, &Storage<int>::set)
+		.endclass()
+	.end();
+
+	std::string script = "a = Int(42); a.value = 5 + a.value; val = a.value;";
+	BOOST_CHECK(!dostring(f, script));
+
+	Object g = globals(f.state);
+	int i = cast<int>(g["val"]);
+
+	BOOST_CHECK_EQUAL(i, 47);
+}
+
+BOOST_AUTO_TEST_CASE(constant_in_class)
+{
+	StateFixture f;
+	module(f.state)
+		.class_<Storage<int>>("Int")
+			.constant("Answer", 42)
+			.constant("AnswerString", "42")
+		.endclass()
+	.end();
+
+	std::string script = "a = Int.Answer; b = Int.AnswerString";
+	BOOST_CHECK(!dostring(f, script));
+
+	Object g = globals(f.state);
+	int i = cast<int>(g["a"]);
+	std::string s = cast<std::string>(g["b"]);
+
+	BOOST_CHECK_EQUAL(i, 42);
+	BOOST_CHECK_EQUAL(s, "42");
+}
+
+BOOST_AUTO_TEST_CASE(non_member_member_bind)
+{
+	StateFixture f;
+	module(f.state)
+		.class_<Storage<int>>("Int")
+			.constructor<int>()
+			.def("add", external_add<int>)
+		.endclass()
+	.end();
+
+	std::string script = "a = Int(100); a:add(42);";
+	BOOST_CHECK(!dostring(f, script));
+
+	Storage<int> val = cast<Storage<int>>(globals(f.state)["a"]);
+	BOOST_CHECK_EQUAL(val.get(), 142);
+}
+BOOST_AUTO_TEST_CASE(non_member_member_bind_through_reference)
+{
+	StateFixture f;
+	module(f.state)
+		.class_<Storage<int>>("Int")
+			.constructor<int>()
+			.def("add", external_add_ref<int>)
+		.endclass()
+	.end();
+
+	std::string script = "a = Int(100); a:add(42);";
+	BOOST_CHECK(!dostring(f, script));
+
+	Storage<int> val = cast<Storage<int>>(globals(f.state)["a"]);
+	BOOST_CHECK_EQUAL(val.get(), 142);
+}
+
+BOOST_AUTO_TEST_CASE(can_call_reference)
+{
+	StateFixture f;
+	module(f.state)
+		.class_<Storage<int>>("Int")
+			.constructor<int>()
+		.endclass()
+		.def("add", external_add_ref<int>)
+	.end();
+
+	std::string script = "a = Int(123); add(a, 2)";
+	BOOST_CHECK(!dostring(f, script));
+	Storage<int> val = cast<Storage<int>>(globals(f.state)["a"]);
+	BOOST_CHECK_EQUAL(val.get(), 125);
 }
