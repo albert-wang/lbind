@@ -22,11 +22,21 @@
 #include "stackcheck.hpp"
 #include "tuplecall.hpp"
 #include "internal.hpp"
+#include "policies.hpp"
 
 namespace LBind
 {
 	namespace Detail
 	{
+		template<typename Seq, typename T>
+		struct contains : boost::mpl::not_<
+			boost::is_same<
+				typename boost::fusion::result_of::find<Seq, T>::type,
+				typename boost::fusion::result_of::end<Seq>::type
+			>
+		>
+		{};
+
 		struct PullFromLua
 		{
 			PullFromLua(lua_State * state)
@@ -101,12 +111,12 @@ namespace LBind
 			}
 		};
 
-		template<typename F, bool isVoid>
+		template<typename F, bool isVoid, typename Policies>
 		struct Function
 		{};
 
-		template<typename F>
-		struct Function<F, false> : FunctionBase
+		template<typename F, typename Policies>
+		struct Function<F, false, Policies> : FunctionBase
 		{
 			Function(F f)
 				:callable(f)
@@ -129,20 +139,29 @@ namespace LBind
 				}
 
 				//Now we have a value that we need to push back to lua
-				auto val = TupleCall<F, typename FunctionTraits<F>::result_type, typename FunctionTraits<F>::parameter_types,
+				auto&& val = TupleCall<F, typename FunctionTraits<F>::result_type, typename FunctionTraits<F>::parameter_types,
 					boost::function_types::function_arity<F>::value,
 					boost::function_types::is_member_function_pointer<F>::value
 				>::apply(callable, std::move(args));
 
-				typedef typename Detail::ConvertToLuaType::template apply<typename boost::function_types::result_type<F>::type>::raw RawType;
-				return Convert<RawType>::to(state, val);
+				if (contains<Policies, returns_self_t>::type::value)
+				{
+					//That is, this returns the first argument.
+					lua_pushvalue(state, 1);
+					return 1;
+				}
+				else
+				{
+					typedef typename Detail::ConvertToLuaType::template apply<typename boost::function_types::result_type<F>::type>::raw RawType;
+					return Convert<RawType>::to(state, val);
+				}
 			}
 
 			F callable;
 		};
 
-		template<typename F>
-		struct Function<F, true> : FunctionBase
+		template<typename F, typename Policies>
+		struct Function<F, true, Policies> : FunctionBase
 		{
 			Function(F f)
 				:callable(f)
@@ -175,12 +194,12 @@ namespace LBind
 			F callable;
 		};
 
-		template<typename F, typename Op, bool isVoid>
+		template<typename F, typename Op, bool isVoid, typename Policies>
 		struct FunctionObject
 		{};
 
-		template<typename F, typename Op>
-		struct FunctionObject<F, Op, false> : FunctionBase
+		template<typename F, typename Op, typename Policies>
+		struct FunctionObject<F, Op, false, Policies> : FunctionBase
 		{
 			FunctionObject(F f)
 				:callable(f)
@@ -209,7 +228,7 @@ namespace LBind
 				}
 
 				//Now we have a value that we need to push back to lua
-				auto val = TupleCall<F, typename FunctionTraits<Op>::result_type, parameter_tuple,
+				auto&& val = TupleCall<F, typename FunctionTraits<Op>::result_type, parameter_tuple,
 					boost::function_types::function_arity<Op>::value - 1,
 					false
 				>::apply(callable, std::move(args));
@@ -221,8 +240,8 @@ namespace LBind
 			F callable;
 		};
 
-		template<typename F, typename Op>
-		struct FunctionObject<F, Op, true> : FunctionBase
+		template<typename F, typename Op, typename Policies>
+		struct FunctionObject<F, Op, true, Policies> : FunctionBase
 		{
 			FunctionObject(F f)
 				:callable(f)
@@ -286,41 +305,43 @@ namespace LBind
 			std::vector<FunctionBase *> canidates;
 		};
 
-		template<typename F, typename Op>
-		FunctionBase * createFunctionObject(F f, Op op)
+		template<typename F, typename Op, typename P>
+		FunctionBase * createFunctionObject(F f, Op op, P p)
 		{
 			return new FunctionObject<F, Op, boost::is_same<
 					void,
 					typename boost::function_types::result_type<Op>::type
-				>::value
+				>::value,
+				P
 			>(f);
 		}
 
 		//Function object overload
-		template<typename F>
-		FunctionBase * createFunction(F f, typename boost::function_types::result_type<decltype(&F::operator())>::type * = nullptr)
+		template<typename F, typename P>
+		FunctionBase * createFunction(F f, P p, typename boost::function_types::result_type<decltype(&F::operator())>::type * = nullptr)
 		{
-			return createFunctionObject(f, &F::operator());
+			return createFunctionObject(f, &F::operator(), p);
 		}
 
 		//Function overload
-		template<typename F>
-		FunctionBase * createFunction(F f, typename boost::remove_reference<typename boost::function_types::result_type<F>::type>::type * = nullptr)
+		template<typename F, typename P>
+		FunctionBase * createFunction(F f, P p, typename boost::remove_reference<typename boost::function_types::result_type<F>::type>::type * = nullptr)
 		{
 			return new Function<F,
 				boost::is_same<
 					void,
 					typename boost::function_types::result_type<F>::type
-				>::value
+				>::value,
+				P
 			>(f);
 		}
 	}
 
-	template<typename F>
-	Detail::FunctionBase * pushFunction(lua_State * state, const char * name, F f)
+	template<typename F, typename P>
+	Detail::FunctionBase * pushFunction(lua_State * state, const char * name, F f, P p)
 	{
 		using namespace Detail;
-		Detail::FunctionBase * base = createFunction(f);
+		Detail::FunctionBase * base = createFunction(f, p);
 
 		//Does this function already exist?
 			//If so, is the function overloaded already?
@@ -338,8 +359,8 @@ namespace LBind
 	}
 
 	//Assumes that a table is on top of the stack.
-	template<typename F>
-	void resolveFunctionOverloads(lua_State * state, const char * name, F f)
+	template<typename F, typename P>
+	void resolveFunctionOverloads(lua_State * state, const char * name, F f, P p)
 	{
 		int type = lua_getfield(state, -1, name);
 		if (type == LUA_TFUNCTION)
@@ -383,7 +404,7 @@ namespace LBind
 					//Stack is [function, old_upvalue]
 				}
 
-				Detail::FunctionBase * newFunction = Detail::createFunction(f);
+				Detail::FunctionBase * newFunction = Detail::createFunction(f, p);
 				internal->registerFunction(newFunction);
 
 				overloaded->canidates.push_back(newFunction);
@@ -396,7 +417,7 @@ namespace LBind
 		{
 			lua_pop(state, 1);
 
-			pushFunction(state, name, f);
+			pushFunction(state, name, f, p);
 			lua_setfield(state, -2, name);
 		}
 	}
@@ -405,9 +426,20 @@ namespace LBind
 	template<typename F>
 	void registerFunction(lua_State * state, int tableIndex, const char * name, F f)
 	{
+		boost::fusion::vector<null_policy_t> np;
+
+
+		return registerFunction(state, tableIndex, name, f, np);
+	}
+
+	template<typename F, typename P>
+	void registerFunction(lua_State * state, int tableIndex, const char * name, F f, P p)
+	{
+		boost::fusion::vector<P> policies(p);
+
 		StackCheck check(state, 1, 0);
 
 		lua_rawgeti(state, LUA_REGISTRYINDEX, tableIndex);
-		resolveFunctionOverloads(state, name, f);
+		resolveFunctionOverloads(state, name, f, policies);
 	}
 }

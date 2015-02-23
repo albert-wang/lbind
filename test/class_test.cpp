@@ -341,13 +341,24 @@ BOOST_AUTO_TEST_CASE(returning_self)
 		module(f.state)
 			.class_<Storage<int>>("Int")
 				.constructor<int>()
-				.def("add", &Storage<int>::fluent_add)
+				.def("add", &Storage<int>::fluent_add, returns_self)
 			.endclass()
 		.end();
 
 		std::string script = "a = Int(123); a:add(4)";
 		BOOST_CHECK(!dostring(f, script));
+
+		Storage<int>& val = cast<Storage<int>>(globals(f.state)["a"]);
+		BOOST_CHECK_EQUAL(val.get(), 127);
+
+		val.stored = 42;
+		script = "a:add(5)";
+		BOOST_CHECK(!dostring(f, script));
+
+		BOOST_CHECK_EQUAL(val.get(), 47);
 	}
 
-	std::cout << c << "\n";
+	//returns_self prevents reallocations for certain calls.
+	BOOST_CHECK_EQUAL(c.constructs, 1);
+	BOOST_CHECK_EQUAL(c.destructs, 1);
 }

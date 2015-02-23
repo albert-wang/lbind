@@ -3,6 +3,7 @@
 #include "object.h"
 #include "convert.hpp"
 #include "function.hpp"
+#include "policies.hpp"
 
 namespace LBind
 {
@@ -306,19 +307,27 @@ namespace LBind
 			template<typename T0>
 			ClassRegistrar& constructor()
 			{
-				constructors.push_back(Detail::createFunction(Construct<T, T0>::invoke));
+				boost::fusion::vector<null_policy_t> np;
+				constructors.push_back(Detail::createFunction(Construct<T, T0>::invoke, np));
+				return *this;
+			}
+
+			template<typename F, typename P>
+			ClassRegistrar& def(boost::string_ref name, F f, P p)
+			{
+				assert(metatable.index() == lua_gettop(state));
+
+				boost::fusion::vector<P> policies(p);
+				resolveFunctionOverloads(state, name.data(), f, policies);
+
+				assert(metatable.index() == lua_gettop(state));
 				return *this;
 			}
 
 			template<typename F>
 			ClassRegistrar& def(boost::string_ref name, F f)
 			{
-				assert(metatable.index() == lua_gettop(state));
-
-				resolveFunctionOverloads(state, name.data(), f);
-
-				assert(metatable.index() == lua_gettop(state));
-				return *this;
+				return def(name, f, null_policy);
 			}
 
 			//This is a member pointer.
