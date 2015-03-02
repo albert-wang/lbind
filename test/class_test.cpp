@@ -43,6 +43,27 @@ namespace
 		return i;
 	}
 
+	struct MultipleStorage
+	{
+		MultipleStorage(int a, std::string b, double c)
+			:a(a)
+			,b(b)
+			,c(c)
+		{}
+
+		MultipleStorage(int a)
+			:a(a)
+		{}
+
+		MultipleStorage()
+			:a(4)
+		{}
+
+		int a;
+		std::string b;
+		double c;
+	};
+
 	template<typename T>
 	struct Storage
 	{
@@ -361,4 +382,46 @@ BOOST_AUTO_TEST_CASE(returning_self)
 	//returns_self prevents reallocations for certain calls.
 	BOOST_CHECK_EQUAL(c.constructs, 1);
 	BOOST_CHECK_EQUAL(c.destructs, 1);
+}
+
+BOOST_AUTO_TEST_CASE(multiple_value_constructor)
+{
+	StateFixture f;
+	module(f.state)
+		.class_<MultipleStorage>("Multi")
+			.constructor<int, std::string, double>()
+		.endclass()
+	.end();
+
+	std::string script = "a = Multi(1, 'hello', 2.4);";
+	BOOST_CHECK(!dostring(f, script));
+
+	MultipleStorage store = cast<MultipleStorage>(globals(f.state)["a"]);
+	BOOST_CHECK_EQUAL(store.a, 1);
+	BOOST_CHECK_EQUAL(store.b, "hello");
+	BOOST_CHECK_EQUAL(store.c, 2.4);
+}
+
+BOOST_AUTO_TEST_CASE(multiple_constructors)
+{
+	StateFixture f;
+	module(f.state)
+		.class_<MultipleStorage>("Multi")
+			.constructor<int, std::string, double>()
+			.constructor<int>()
+			.constructor()
+		.endclass()
+	.end();
+
+	std::string script = "a = Multi(1, 'hello', 2.4); b = Multi(2); c = Multi()";
+	BOOST_CHECK(!dostring(f, script));
+
+	MultipleStorage store = cast<MultipleStorage>(globals(f.state)["a"]);
+	MultipleStorage store2 = cast<MultipleStorage>(globals(f.state)["b"]);
+	MultipleStorage store3 = cast<MultipleStorage>(globals(f.state)["c"]);
+	BOOST_CHECK_EQUAL(store.a, 1);
+	BOOST_CHECK_EQUAL(store.b, "hello");
+	BOOST_CHECK_EQUAL(store.c, 2.4);
+	BOOST_CHECK_EQUAL(store2.a, 2);
+	BOOST_CHECK_EQUAL(store3.a, 4);
 }

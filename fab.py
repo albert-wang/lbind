@@ -3,7 +3,7 @@ from fabricate import *
 import glob
 import os
 
-CFLAGS = "-Wall -Wno-unknown-pragmas -Wno-c++11-extensions -Wno-unused-variable -g -std=c++11 -stdlib=libc++ -Iinclude -I../lua/src".split()
+CFLAGS = "-O2 -Wall -Wno-unknown-pragmas -Wno-c++11-extensions -Wno-unused-variable -g -std=c++11 -stdlib=libc++ -Iinclude -I../lua/src".split()
 LDFLAGS = "-lboost_thread -lboost_system -lc++ -llua -L.".split()
 
 def out(d, fname) :

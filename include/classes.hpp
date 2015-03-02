@@ -5,6 +5,8 @@
 #include "function.hpp"
 #include "policies.hpp"
 
+#include <boost/preprocessor/iteration/local.hpp>
+
 namespace LBind
 {
 	class Scope;
@@ -174,15 +176,24 @@ namespace LBind
 			M pointer;
 		};
 
-		template<typename T, typename T0>
-		struct Construct
+		template<typename T>
+		struct Construct0
 		{
-			static T * invoke(Ignored*, T0&& v)
+			static T * invoke(Ignored*)
 			{
-				T * result = new T(std::forward<T0>(v));
+				T * result = new T();
 				return static_cast<T *>(ownership(result, Owned));
 			}
 		};
+
+#define BOOST_PP_LOCAL_LIMITS (1, 10)
+#define FORWARD_ARGS(z, n, d) BOOST_PP_COMMA_IF(n) std::forward<BOOST_PP_CAT(T, n)>(BOOST_PP_CAT(t, n))
+#define BOOST_PP_LOCAL_MACRO(n) \
+		template<typename R, BOOST_PP_ENUM_PARAMS(n, typename T)> \
+		struct BOOST_PP_CAT(Construct, n) \
+		{ static R * invoke(Ignored*, BOOST_PP_ENUM_BINARY_PARAMS(n, T, &&t)) { R * result = new R(BOOST_PP_REPEAT(n, FORWARD_ARGS, ~)); return static_cast<R *>(ownership(result, Owned)); }};
+
+#include BOOST_PP_LOCAL_ITERATE()
 
 		template<typename T>
 		class ClassRegistrar
@@ -303,14 +314,19 @@ namespace LBind
 				return *this;
 			}
 
-			//TODO: expand this to many arguments.
-			template<typename T0>
 			ClassRegistrar& constructor()
 			{
 				boost::fusion::vector<null_policy_t> np;
-				constructors.push_back(Detail::createFunction(Construct<T, T0>::invoke, np));
+				constructors.push_back(Detail::createFunction(Construct0<T>::invoke, np));
 				return *this;
 			}
+
+#define BOOST_PP_LOCAL_LIMITS (1, 10)
+#define BOOST_PP_LOCAL_MACRO(n) \
+			template<BOOST_PP_ENUM_PARAMS(n, typename T)>	\
+			ClassRegistrar& constructor() { boost::fusion::vector<null_policy_t> np; constructors.push_back(Detail::createFunction(BOOST_PP_CAT(Construct, n)<T, BOOST_PP_ENUM_PARAMS(n, T)>::invoke, np)); return *this; }
+
+#include BOOST_PP_LOCAL_ITERATE()
 
 			template<typename F, typename P>
 			ClassRegistrar& def(boost::string_ref name, F f, P p)

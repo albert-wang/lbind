@@ -285,3 +285,39 @@ BOOST_AUTO_TEST_CASE(string_to_integer_conversion_is_implicit)
 
 	BOOST_CHECK_EQUAL(res, 3);
 }
+/*
+//COROUTINES work!
+BOOST_AUTO_TEST_CASE(coroutines_work)
+{
+	using namespace LBind;
+
+	StateFixture f;
+	Coroutine thread = cast<Coroutine>(globals(f.state)["th"]);
+
+	//Currently, only very trivial resumes() are supported.
+	thread.resume();
+
+
+	"R(
+		funciton WaitFrames(entity, n)
+			entity.LogicWaitSteps = n
+			coroutine.yield();
+		end
+
+		status = coroutine.create(function(A)
+			A:EMWaitFrames(self, 30);
+			A:EMBroadcastMessage(A.EMBossAdd | 1, 'explode', {})
+		end);
+
+		---------
+
+		onMessage_explode = function(self, A)
+			A:BInvokeTurret('circle', self.position, {});
+			self:die();
+		end
+	)R"
+
+
+
+	thread.resume();
+}*/
