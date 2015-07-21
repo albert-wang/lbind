@@ -369,7 +369,7 @@ BOOST_AUTO_TEST_CASE(returning_self)
 		std::string script = "a = Int(123); a:add(4)";
 		BOOST_CHECK(!dostring(f, script));
 
-		Storage<int>& val = cast<Storage<int>>(globals(f.state)["a"]);
+		Storage<int>& val = cast<Storage<int>&>(globals(f.state)["a"]);
 		BOOST_CHECK_EQUAL(val.get(), 127);
 
 		val.stored = 42;

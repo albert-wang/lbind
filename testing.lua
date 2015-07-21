@@ -10,13 +10,10 @@ function pt(t)
 	for key,value in pairs(t) do print(key,value) end
 end
 
-pt(a)
-a = 6.3;
 
-foo:bar("Nyan", 2);
-
+print(foo:bar(foo))
 print(foo.a);
 foo.a = 1;
-foo:bar("!", 3);
+foo:bar(foo);
 
 print("Magic: " .. Foo.magic);

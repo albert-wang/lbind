@@ -163,6 +163,12 @@ namespace LBind
 		return Object(state, LUA_RIDX_GLOBALS);
 	}
 
+	Object compile(lua_State * state, const char * data)
+	{
+		luaL_loadstring(state, data);
+		return Object::fromStack(state, -1);
+	}
+
 	namespace Detail
 	{
 		Iterator::Iterator(Object * o)

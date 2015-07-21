@@ -147,6 +147,12 @@ namespace LBind
 			return std::move(t);
 		}
 
+		template<typename T>
+		static T&& universal(Object&& t)
+		{
+			return static_cast<T&&>(t);
+		}
+
 		static int from(lua_State * state, int index, type& out)
 		{
 			out = Object::fromStack(state, index);
@@ -183,6 +189,40 @@ namespace LBind
 		}
 	};
 
+	namespace Detail 
+	{
+		template<typename T>
+		struct IsPointerToNonprimitive
+			: boost::mpl::and_<
+				boost::is_pointer<T>, 
+				boost::mpl::not_<typename Convert<T>::is_primitive>
+			>
+		{};
+
+		template<typename T>
+		struct IsNonprimitiveReference
+			: boost::mpl::and_<
+				boost::is_reference<T>,
+				boost::mpl::not_<typename Convert<T>::is_primitive>
+			>
+		{};
+
+		template<typename T>
+		struct IsNonprimitiveValue  
+			: boost::mpl::not_<
+				boost::mpl::or_<
+					typename Convert<T>::is_primitive, 
+					boost::is_pointer<T>,
+					boost::is_reference<T>
+				>
+			>
+		{};
+	}
+
+	// Index cast is called more or less directly from cast, and has three major variants.
+	// The first one casts non-pointer primitives, such as ints, floats, doubles and strings, which returns a value.
+	// The second one converts pointer-to-nonprimitive type, mostly uservalues bound to lua. 
+	// The third is basically the same as the second one, but with const.
 	template<typename T>
 	T indexCast(lua_State * s, int i, typename boost::enable_if<typename Convert<T>::is_primitive>::type * = nullptr)
 	{
@@ -192,13 +232,44 @@ namespace LBind
 	}
 
 	template<typename T>
-	T& indexCast(lua_State * s, int i, typename boost::disable_if<typename Convert<T>::is_primitive>::type * = nullptr)
+	T indexCast(lua_State *s, int i, typename boost::enable_if<Detail::IsPointerToNonprimitive<T>>::type * = nullptr)
 	{
-		T * result = nullptr;
+		T result = nullptr;
 		Convert<T>::from(s, i, result);
+		return result;
+	}
+
+	template<typename T>
+	T indexCast(lua_State *s, int i, typename boost::enable_if<Detail::IsNonprimitiveReference<T>>::type * = nullptr)
+	{
+		typedef typename boost::remove_reference<T>::type base;
+		base* result = nullptr;
+		Convert<base*>::from(s, i, result);
 		return *result;
 	}
 
+	template<typename T>
+	T indexCast(lua_State *s, int i, typename boost::enable_if<Detail::IsNonprimitiveValue<T>>::type * = nullptr)
+	{
+		T* result = nullptr;
+		Convert<T*>::from(s, i, result);
+		return *result;
+	}
+
+	template<typename T>
+	T cast(const Object& o) 
+	{
+		StackCheck check(o.state(), 1, 0);
+		Convert<Object>::to(o.state(), o);
+		return indexCast<T>(o.state(), -1);
+	}
+
+	template<typename T>
+	T cast(const StackObject& o) 
+	{
+		return indexCast<T>(o.state(), o.index());
+	}
+/*
 	template<typename T>
 	T cast(const Object& o, typename boost::enable_if<typename Convert<T>::is_primitive>::type * = nullptr)
 	{
@@ -214,7 +285,7 @@ namespace LBind
 	}
 
 	template<typename T>
-	T& cast(const Object& o, typename boost::disable_if<typename Convert<T>::is_primitive>::type * = nullptr)
+	T& cast(const Object& o, typename boost::disable_if<Detail::IsPointerTo
 	{
 		StackCheck check(o.state(), 1, 0);
 		Convert<Object>::to(o.state(), o);
@@ -226,6 +297,7 @@ namespace LBind
 	{
 		return indexCast<T>(o.state(), o.index());
 	}
+*/
 
 	namespace Detail
 	{
@@ -332,4 +404,5 @@ namespace LBind
 
 	Object newtable(lua_State * state);
 	Object globals(lua_State * state);
+	Object compile(lua_State * state, const char * data);
 }

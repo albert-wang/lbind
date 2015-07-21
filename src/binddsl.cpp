@@ -1,6 +1,7 @@
 #include "binddsl.hpp"
 #include "stackcheck.hpp"
 #include "exceptions.hpp"
+#include "convert.hpp"
 
 #include <cassert>
 #include <iostream>

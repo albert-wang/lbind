@@ -26,6 +26,7 @@
 #include "tuplecall.hpp"
 #include "function.hpp"
 #include "classes.hpp"
+#include "binddsl.hpp"
 #include "init.hpp"
 
 struct Foo
@@ -34,9 +35,11 @@ struct Foo
 		:a(a)
 	{}
 
-	std::string bar(LBind::Object i, double b)
+	std::string bar(LBind::Object a)
 	{
-		std::cout << a << " -> " << LBind::cast<std::string>(i) << " " << b << "\n";
+		Foo * f = LBind::cast<Foo *>(a);
+
+		std::cout << f->a << "\n";
 		return "Dongs";
 	}
 
@@ -84,32 +87,23 @@ int main(int argc, char * argv[])
 		- properties are done through a C++ interface hooked into __index and __newindex for get/set
 			- If lookup fails, then just rawset to the table.
 */
-
-	LBind::registerClass<Foo>(state, "Foo")
-		.constant(42, "magic")
-		.def(&Foo::bar, "bar")
-		.def_readwrite(&Foo::a, "a")
-		.finish();
-	;
+	LBind::module(state)
+		.class_<Foo>("Foo")
+			.constant("magic", 42)
+			.def("bar", &Foo::bar)
+			.def_readwrite("a", &Foo::a)
+		.endclass()
+	.end();
 
 	Foo ff(42);
-	LBind::registerFunction(state, "testing", &Foo::bar);
-
 	LBind::Object obj = LBind::newtable(state);
-	LBind::StackObject stack = obj.push();
 
-	stack["kitty"] = 2.5;
-	stack["dog"] = stack["kitty"];
-
-	float a = stack["kitty"];
-
-	obj.pop(stack);
-
+	obj["kitty"] = 42;
+	obj["dog"] = obj["kitty"];
 	obj[1] = 2.5;
 
 	LBind::Object globals = LBind::globals(state);
-	globals["a"] = obj;
-	globals["foo"] = &ff;
+	globals["foo"] = ff;
 
 	if (luaL_dofile(state, argv[1]))
 	{

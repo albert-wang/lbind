@@ -467,6 +467,8 @@ namespace LBind
 	template<typename T>
 	struct Convert<T, typename boost::enable_if<boost::is_pointer<T>>::type>
 	{
+		//TODO: Make sure that this is only a level 1 pointer, not 2 or more
+
 		typedef typename Undecorate<T>::type Undecorated;
 
 		//This is what is used to store this value in the argument tuple before pulling the real value from lua.
@@ -487,10 +489,12 @@ namespace LBind
 		}
 
 		//Converts a value at the given index. Must write to out, and return the number of stack objects consumed.
+		// THIS IS A VERY SPECIFICALLY WRITTEN FROM METHOD. MAKE SURE THAT YOU UNDERSTAND THE TYPES HERE
+		// NB: type is a T*
 		static int from(lua_State * state, int index, type& out)
 		{
-			type * block = static_cast<type *>(Detail::ownershipless(lua_touserdata(state, index)));
-			out = block;
+			type* block = static_cast<type*>(lua_touserdata(state, index));
+			out = static_cast<type>(Detail::ownershipless(*block));
 			return 1;
 		}
 

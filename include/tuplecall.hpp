@@ -131,7 +131,8 @@ namespace LBind
 			o.push();
 			Detail::pcallWrapper(o.state(), 0, 1, 0);
 			R res;
-			return Convert<R>::from(o.state(), -1, res);
+			Convert<R>::from(o.state(), -1, res);
+			return res;
 		}
 
 #define BOOST_PP_LOCAL_LIMITS (1, 10)

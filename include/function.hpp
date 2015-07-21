@@ -150,6 +150,10 @@ namespace LBind
 					lua_pushvalue(state, 1);
 					return 1;
 				}
+				else if (contains<Policies, ignore_return_t>::type::value)
+				{
+					return 0;
+				}
 				else
 				{
 					typedef typename Detail::ConvertToLuaType::template apply<typename boost::function_types::result_type<F>::type>::raw RawType;

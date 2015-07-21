@@ -22,4 +22,14 @@ namespace LBind
 
 		InternalState * getInternalState(lua_State *);
 	}
+
+	struct Statistics
+	{
+		size_t converts;
+		size_t luaToC;
+		size_t cToLua;
+	};
+
+	//Passing in null gets global statistics
+	const Statistics& getStatistics(lua_State *);
 }

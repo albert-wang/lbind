@@ -151,6 +151,51 @@ namespace
 }
 
 using namespace LBind;
+BOOST_AUTO_TEST_CASE(chunk_vs_string)
+{
+	StateFixture f;
+	size_t iterations = 2;
+	std::string script = "a = 1; return a + 1";
+
+	auto start = std::chrono::high_resolution_clock::now();
+	for (size_t i = 0; i < iterations; ++i)
+	{
+		BOOST_CHECK(!dostring(f, script));
+		int a = lua_tointeger(f.state, -1);
+		BOOST_CHECK_EQUAL(a, 2);
+	}
+	auto end = std::chrono::high_resolution_clock::now();
+	auto elapsed = end - start;
+
+	start = std::chrono::high_resolution_clock::now();
+	luaL_loadstring(f.state, script.c_str());
+	stackdump(f.state);
+	for (size_t i = 0; i < iterations; ++i)
+	{
+		std::cout << lua_gettop(f.state) << "\n";
+		lua_pcall(f.state, 0, 0, 0);
+		int a = lua_tointeger(f.state, -1);
+		BOOST_CHECK_EQUAL(a, 2);
+		lua_pop(f.state, 1);
+	}
+	end = std::chrono::high_resolution_clock::now();
+	auto loadElapsed = end - start;
+
+	start = std::chrono::high_resolution_clock::now();
+	Object fn = compile(f.state, script.c_str());
+	for (size_t i = 0; i < iterations; ++i)
+	{
+		int a = call<int>(fn);
+		BOOST_CHECK_EQUAL(a, 2);
+	}
+	end = std::chrono::high_resolution_clock::now();
+	auto basicobject = end - start;
+
+	std::cout << "100k dostring: " << std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count() << " us\n";
+	std::cout << "100k dochunk : " << std::chrono::duration_cast<std::chrono::microseconds>(loadElapsed).count() << " us\n";
+	std::cout << "100k object  : " << std::chrono::duration_cast<std::chrono::microseconds>(basicobject).count() << " us\n";
+}
+
 BOOST_AUTO_TEST_CASE(performance_difference)
 {
 	StateFixture f;
@@ -202,10 +247,10 @@ BOOST_AUTO_TEST_CASE(performance_difference)
 	end = std::chrono::high_resolution_clock::now();
 	auto rawelapsed = end - start;
 
-	std::cout << "1 million    a:add(1): " << std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count() << "us\n";
-	std::cout << "1 million      a += 1: " << std::chrono::duration_cast<std::chrono::microseconds>(scriptelapsed).count() << "us\n";
-	std::cout << "1 million   add(a, 1): " << std::chrono::duration_cast<std::chrono::microseconds>(externadd).count() << "us\n";
-	std::cout << "1 million  cadd(a, 1): " << std::chrono::duration_cast<std::chrono::microseconds>(calladd).count() << "us\n";
-	std::cout << "1 million  ladd(a, 1): " << std::chrono::duration_cast<std::chrono::microseconds>(luaadd).count() << "us\n";
-	std::cout << "1 million   raw(a, 1): " << std::chrono::duration_cast<std::chrono::microseconds>(rawelapsed).count() << "us\n";
+	std::cout << "1 million    a:add(1): " << std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count() << " us\n";
+	std::cout << "1 million      a += 1: " << std::chrono::duration_cast<std::chrono::microseconds>(scriptelapsed).count() << " us\n";
+	std::cout << "1 million   add(a, 1): " << std::chrono::duration_cast<std::chrono::microseconds>(externadd).count() << " us\n";
+	std::cout << "1 million  cadd(a, 1): " << std::chrono::duration_cast<std::chrono::microseconds>(calladd).count() << " us\n";
+	std::cout << "1 million  ladd(a, 1): " << std::chrono::duration_cast<std::chrono::microseconds>(luaadd).count() << " us\n";
+	std::cout << "1 million   raw(a, 1): " << std::chrono::duration_cast<std::chrono::microseconds>(rawelapsed).count() << " us\n";
 }
