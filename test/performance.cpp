@@ -154,7 +154,7 @@ using namespace LBind;
 BOOST_AUTO_TEST_CASE(chunk_vs_string)
 {
 	StateFixture f;
-	size_t iterations = 2;
+	size_t iterations = 100 * 1000;
 	std::string script = "a = 1; return a + 1";
 
 	auto start = std::chrono::high_resolution_clock::now();
@@ -162,6 +162,7 @@ BOOST_AUTO_TEST_CASE(chunk_vs_string)
 	{
 		BOOST_CHECK(!dostring(f, script));
 		int a = lua_tointeger(f.state, -1);
+		lua_pop(f.state, 1);
 		BOOST_CHECK_EQUAL(a, 2);
 	}
 	auto end = std::chrono::high_resolution_clock::now();
@@ -169,11 +170,10 @@ BOOST_AUTO_TEST_CASE(chunk_vs_string)
 
 	start = std::chrono::high_resolution_clock::now();
 	luaL_loadstring(f.state, script.c_str());
-	stackdump(f.state);
 	for (size_t i = 0; i < iterations; ++i)
 	{
-		std::cout << lua_gettop(f.state) << "\n";
-		lua_pcall(f.state, 0, 0, 0);
+		lua_pushvalue(f.state, -1);
+		lua_pcall(f.state, 0, 1, 0);
 		int a = lua_tointeger(f.state, -1);
 		BOOST_CHECK_EQUAL(a, 2);
 		lua_pop(f.state, 1);
