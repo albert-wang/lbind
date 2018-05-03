@@ -150,6 +150,19 @@ namespace
 
 }
 
+template<typename CB>
+void bench(uint64_t* fastest, size_t iterations, const char * name, CB&& cb) {
+	auto start = std::chrono::high_resolution_clock::now();
+
+	for (size_t i = 0; i < iterations; ++i)
+	{
+		cb();
+	}
+
+	auto end = std::chrono::high_resolution_clock::now();
+	std::cout << iterations << " " << name << ": " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us\n";
+}
+
 using namespace LBind;
 BOOST_AUTO_TEST_CASE(chunk_vs_string)
 {
@@ -157,43 +170,28 @@ BOOST_AUTO_TEST_CASE(chunk_vs_string)
 	size_t iterations = 100 * 1000;
 	std::string script = "a = 1; return a + 1";
 
-	auto start = std::chrono::high_resolution_clock::now();
-	for (size_t i = 0; i < iterations; ++i)
-	{
+	uint64_t fastest = 0;
+	bench(&fastest, iterations, "dostring", [&]() {
 		BOOST_CHECK(!dostring(f, script));
 		int a = lua_tointeger(f.state, -1);
 		lua_pop(f.state, 1);
 		BOOST_CHECK_EQUAL(a, 2);
-	}
-	auto end = std::chrono::high_resolution_clock::now();
-	auto elapsed = end - start;
+	});
 
-	start = std::chrono::high_resolution_clock::now();
 	luaL_loadstring(f.state, script.c_str());
-	for (size_t i = 0; i < iterations; ++i)
-	{
+	bench(&fastest, iterations, "dochunk", [&]() {
 		lua_pushvalue(f.state, -1);
 		lua_pcall(f.state, 0, 1, 0);
 		int a = lua_tointeger(f.state, -1);
 		BOOST_CHECK_EQUAL(a, 2);
 		lua_pop(f.state, 1);
-	}
-	end = std::chrono::high_resolution_clock::now();
-	auto loadElapsed = end - start;
+	});
 
-	start = std::chrono::high_resolution_clock::now();
 	Object fn = compile(f.state, script.c_str());
-	for (size_t i = 0; i < iterations; ++i)
-	{
+	bench(&fastest, iterations, "doobject", [&]() {
 		int a = call<int>(fn);
 		BOOST_CHECK_EQUAL(a, 2);
-	}
-	end = std::chrono::high_resolution_clock::now();
-	auto basicobject = end - start;
-
-	std::cout << "100k dostring: " << std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count() << " us\n";
-	std::cout << "100k dochunk : " << std::chrono::duration_cast<std::chrono::microseconds>(loadElapsed).count() << " us\n";
-	std::cout << "100k object  : " << std::chrono::duration_cast<std::chrono::microseconds>(basicobject).count() << " us\n";
+	});
 }
 
 BOOST_AUTO_TEST_CASE(performance_difference)
@@ -203,54 +201,46 @@ BOOST_AUTO_TEST_CASE(performance_difference)
 		.class_<Storage<int>>("Int")
 			.constructor<int>()
 			.def("add", &Storage<int>::fluent_add, returns_self)
+			.def("addnr", &Storage<int>::add)
 		.endclass()
 		.def("add", external_add<int>)
 		.def("add_i", add_i)
 	.end();
 
-	std::string script = "a = Int(0); for i = 1, 1000 * 1000 do a:add(1) end";
+	uint64_t fastest = 0;
+	bench(&fastest, 1, "a:add", [&]() {
+		std::string script = "a = Int(0); for i = 1, 1000 * 1000 do a:add(1) end";
+		BOOST_CHECK(!dostring(f, script));
+	});
 
-	auto start = std::chrono::high_resolution_clock::now();
-	BOOST_CHECK(!dostring(f, script));
-	auto end = std::chrono::high_resolution_clock::now();
-	auto elapsed = end - start;
+	bench(&fastest, 1, "a:addnr", [&]() {
+		std::string script = "a = Int(0); for i = 1, 1000 * 1000 do a:addnr(1) end";
+		BOOST_CHECK(!dostring(f, script));
+	});
 
-	script = "a = 0; for i = 1, 1000 * 1000 do a = a + 1 end";
-	start = std::chrono::high_resolution_clock::now();
-	BOOST_CHECK(!dostring(f, script));
-	end = std::chrono::high_resolution_clock::now();
-	auto scriptelapsed = end - start;
+	bench(&fastest, 1, "a+=1", [&]() {
+		std::string script = "a = 0; for i = 1, 1000 * 1000 do a = a + 1 end";
+		BOOST_CHECK(!dostring(f, script));
+	});
 
-	script = "a = Int(0); for i = 1, 1000 * 1000 do add(a, 1) end";
-	start = std::chrono::high_resolution_clock::now();
-	BOOST_CHECK(!dostring(f, script));
-	end = std::chrono::high_resolution_clock::now();
-	auto externadd = end - start;
+	bench(&fastest, 1, "add(a, 1)", [&]() {
+		std::string script = "a = Int(0); for i = 1, 1000 * 1000 do add(a, 1) end";
+		BOOST_CHECK(!dostring(f, script));
+	});
 
-	script = "a = 0; for i = 1, 1000 * 1000 do a = add_i(a, 1) end";
-	start = std::chrono::high_resolution_clock::now();
-	BOOST_CHECK(!dostring(f, script));
-	end = std::chrono::high_resolution_clock::now();
-	auto calladd = end - start;
+	bench(&fastest, 1, "cadd(a, 1)", [&]() {
+		std::string script = "a = 0; for i = 1, 1000 * 1000 do a = add_i(a, 1) end";
+		BOOST_CHECK(!dostring(f, script));
+	});
 
-	script = "function add_g(a, b) return a + b end a = 0; local add_n = add_g; for i = 1, 1000 * 1000 do a = add_n(a, 1) end";
-	start = std::chrono::high_resolution_clock::now();
-	BOOST_CHECK(!dostring(f, script));
-	end = std::chrono::high_resolution_clock::now();
-	auto luaadd = end - start;
+	bench(&fastest, 1, "ladd(a, 1)", [&]() {
+		std::string script = "function add_g(a, b) return a + b end a = 0; local add_n = add_g; for i = 1, 1000 * 1000 do a = add_n(a, 1) end";
+		BOOST_CHECK(!dostring(f, script));
+	});
 
 	lua_register(f.state, "add_raw", add_lua);
-
-	script = "a = 0; for i = 1, 1000 * 1000 do add_raw(a, 1) end";
-	start = std::chrono::high_resolution_clock::now();
-	BOOST_CHECK(!dostring(f, script));
-	end = std::chrono::high_resolution_clock::now();
-	auto rawelapsed = end - start;
-
-	std::cout << "1 million    a:add(1): " << std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count() << " us\n";
-	std::cout << "1 million      a += 1: " << std::chrono::duration_cast<std::chrono::microseconds>(scriptelapsed).count() << " us\n";
-	std::cout << "1 million   add(a, 1): " << std::chrono::duration_cast<std::chrono::microseconds>(externadd).count() << " us\n";
-	std::cout << "1 million  cadd(a, 1): " << std::chrono::duration_cast<std::chrono::microseconds>(calladd).count() << " us\n";
-	std::cout << "1 million  ladd(a, 1): " << std::chrono::duration_cast<std::chrono::microseconds>(luaadd).count() << " us\n";
-	std::cout << "1 million   raw(a, 1): " << std::chrono::duration_cast<std::chrono::microseconds>(rawelapsed).count() << " us\n";
+	bench(&fastest, 1, "raw(a, 1)", [&]() {
+		std::string script = "a = 0; for i = 1, 1000 * 1000 do add_raw(a, 1) end";
+		BOOST_CHECK(!dostring(f, script));
+	});
 }

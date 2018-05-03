@@ -4,6 +4,7 @@
 #include "stackcheck.hpp"
 
 #include <boost/utility/string_ref.hpp>
+#include <boost/mpl/logical.hpp>
 #include <iostream>
 
 namespace LBind
@@ -189,12 +190,12 @@ namespace LBind
 		}
 	};
 
-	namespace Detail 
+	namespace Detail
 	{
 		template<typename T>
 		struct IsPointerToNonprimitive
 			: boost::mpl::and_<
-				boost::is_pointer<T>, 
+				boost::is_pointer<T>,
 				boost::mpl::not_<typename Convert<T>::is_primitive>
 			>
 		{};
@@ -208,10 +209,10 @@ namespace LBind
 		{};
 
 		template<typename T>
-		struct IsNonprimitiveValue  
+		struct IsNonprimitiveValue
 			: boost::mpl::not_<
 				boost::mpl::or_<
-					typename Convert<T>::is_primitive, 
+					typename Convert<T>::is_primitive,
 					boost::is_pointer<T>,
 					boost::is_reference<T>
 				>
@@ -221,7 +222,7 @@ namespace LBind
 
 	// Index cast is called more or less directly from cast, and has three major variants.
 	// The first one casts non-pointer primitives, such as ints, floats, doubles and strings, which returns a value.
-	// The second one converts pointer-to-nonprimitive type, mostly uservalues bound to lua. 
+	// The second one converts pointer-to-nonprimitive type, mostly uservalues bound to lua.
 	// The third is basically the same as the second one, but with const.
 	template<typename T>
 	T indexCast(lua_State * s, int i, typename boost::enable_if<typename Convert<T>::is_primitive>::type * = nullptr)
@@ -257,7 +258,7 @@ namespace LBind
 	}
 
 	template<typename T>
-	T cast(const Object& o) 
+	T cast(const Object& o)
 	{
 		StackCheck check(o.state(), 1, 0);
 		Convert<Object>::to(o.state(), o);
@@ -265,7 +266,7 @@ namespace LBind
 	}
 
 	template<typename T>
-	T cast(const StackObject& o) 
+	T cast(const StackObject& o)
 	{
 		return indexCast<T>(o.state(), o.index());
 	}
