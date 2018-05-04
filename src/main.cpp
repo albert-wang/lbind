@@ -117,8 +117,6 @@ int main(int argc, char * argv[])
 	int res = lbind::call<int>(globals["sub"], 42, 1);
 	std::cout << "Result: " << res << "\n";
 
-
-
 	lua_close(state);
 }
 #endif
