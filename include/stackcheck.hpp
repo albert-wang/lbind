@@ -1,7 +1,7 @@
 #pragma once
 #include "lua.hpp"
 
-namespace LBind
+namespace lbind
 {
 	//This ensures the state of the stack.
 	struct StackCheck

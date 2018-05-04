@@ -16,7 +16,7 @@
 #include "convert.hpp"
 
 
-namespace LBind
+namespace lbind
 {
 	namespace Detail
 	{

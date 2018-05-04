@@ -11,7 +11,7 @@
 #include <iostream>
 #include "exceptions.hpp"
 
-namespace LBind
+namespace lbind
 {
 	template<typename T>
 	struct Undecorate

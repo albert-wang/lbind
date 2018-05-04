@@ -1,6 +1,6 @@
 #include "classes.hpp"
 
-namespace LBind
+namespace lbind
 {
 	namespace Detail
 	{

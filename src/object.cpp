@@ -1,6 +1,6 @@
 #include "object.h"
 
-namespace LBind
+namespace lbind
 {
 	Object::Object(lua_State * state, int index)
 		:interpreter(state)

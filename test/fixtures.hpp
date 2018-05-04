@@ -8,13 +8,13 @@ struct StateFixture
 	{
 		state = luaL_newstate();
 
-		LBind::open(state);
+		lbind::open(state);
 		luaL_openlibs(state);
 	}
 
 	inline ~StateFixture()
 	{
-		LBind::close(state);
+		lbind::close(state);
 		lua_close(state);
 	}
 

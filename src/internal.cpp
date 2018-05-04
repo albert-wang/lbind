@@ -3,7 +3,7 @@
 
 #include <memory>
 
-namespace LBind
+namespace lbind
 {
 	namespace Detail
 	{

@@ -1,6 +1,6 @@
 #pragma once
 
-namespace LBind
+namespace lbind
 {
 	struct null_policy_t
 	{};

@@ -2,7 +2,7 @@
 #include <vector>
 #include <lua.hpp>
 
-namespace LBind
+namespace lbind
 {
 	namespace Detail
 	{

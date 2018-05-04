@@ -35,17 +35,17 @@ struct Foo
 		:a(a)
 	{}
 
-	std::string bar(LBind::Object a)
+	std::string bar(lbind::Object a)
 	{
-		Foo * f = LBind::cast<Foo *>(a);
+		Foo * f = lbind::cast<Foo *>(a);
 
 		std::cout << f->a << "\n";
 		return "Dongs";
 	}
 
-	void yap(LBind::Object i, double b)
+	void yap(lbind::Object i, double b)
 	{
-		std::cout << LBind::cast<std::string>(i) << " " << b << " Yap\n";
+		std::cout << lbind::cast<std::string>(i) << " " << b << " Yap\n";
 	}
 
 	int a;
@@ -70,7 +70,7 @@ void basicz()
 int main(int argc, char * argv[])
 {
 	lua_State * state = luaL_newstate();
-	LBind::open(state);
+	lbind::open(state);
 
 	luaL_openlibs(state);
 
@@ -87,7 +87,7 @@ int main(int argc, char * argv[])
 		- properties are done through a C++ interface hooked into __index and __newindex for get/set
 			- If lookup fails, then just rawset to the table.
 */
-	LBind::module(state)
+	lbind::module(state)
 		.class_<Foo>("Foo")
 			.constant("magic", 42)
 			.def("bar", &Foo::bar)
@@ -96,13 +96,13 @@ int main(int argc, char * argv[])
 	.end();
 
 	Foo ff(42);
-	LBind::Object obj = LBind::newtable(state);
+	lbind::Object obj = lbind::newtable(state);
 
 	obj["kitty"] = 42;
 	obj["dog"] = obj["kitty"];
 	obj[1] = 2.5;
 
-	LBind::Object globals = LBind::globals(state);
+	lbind::Object globals = lbind::globals(state);
 	globals["foo"] = ff;
 
 	if (luaL_dofile(state, argv[1]))
@@ -113,9 +113,11 @@ int main(int argc, char * argv[])
 
 	float f = globals["a"];
 
-	LBind::call<void>(globals["add"], 1, 52);
-	int res = LBind::call<int>(globals["sub"], 42, 1);
+	lbind::call<void>(globals["add"], 1, 52);
+	int res = lbind::call<int>(globals["sub"], 42, 1);
 	std::cout << "Result: " << res << "\n";
+
+
 
 	lua_close(state);
 }

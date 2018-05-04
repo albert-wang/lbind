@@ -24,7 +24,7 @@
 #include "internal.hpp"
 #include "policies.hpp"
 
-namespace LBind
+namespace lbind
 {
 	namespace Detail
 	{

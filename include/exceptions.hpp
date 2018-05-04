@@ -1,7 +1,7 @@
 #include <stdexcept>
 #pragma once
 
-namespace LBind
+namespace lbind
 {
 	class BadCast : public std::runtime_error
 	{

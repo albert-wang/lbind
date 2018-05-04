@@ -3,6 +3,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/fusion/include/at_c.hpp>
 #include <chrono>
+#include <fmt/format.h>
 #include "fixtures.hpp"
 #include "binddsl.hpp"
 
@@ -151,7 +152,7 @@ namespace
 }
 
 template<typename CB>
-void bench(uint64_t* fastest, size_t iterations, const char * name, CB&& cb) {
+void bench(uint64_t* first, size_t iterations, const char * name, CB&& cb) {
 	auto start = std::chrono::high_resolution_clock::now();
 
 	for (size_t i = 0; i < iterations; ++i)
@@ -160,10 +161,23 @@ void bench(uint64_t* fastest, size_t iterations, const char * name, CB&& cb) {
 	}
 
 	auto end = std::chrono::high_resolution_clock::now();
-	std::cout << iterations << " " << name << ": " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us\n";
+
+	uint64_t duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+	if (first && *first == 0)
+	{
+		*first = duration;
+	}
+
+	double factor = 1;
+	if (*first != 0)
+	{
+		factor = static_cast<double>(duration) / static_cast<double>(*first);
+	}
+
+	std::cout << fmt::format("iter={:12n} name={:24s} time={:12n} factor= {:.2f}", iterations, name, duration, factor) << "\n";
 }
 
-using namespace LBind;
+using namespace lbind;
 BOOST_AUTO_TEST_CASE(chunk_vs_string)
 {
 	StateFixture f;

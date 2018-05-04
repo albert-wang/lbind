@@ -1,7 +1,7 @@
 #include "init.hpp"
 #include "internal.hpp"
 
-namespace LBind
+namespace lbind
 {
 	void open(lua_State * state)
 	{

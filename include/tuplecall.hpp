@@ -7,12 +7,11 @@
 
 #include <iostream>
 
-namespace LBind
+namespace lbind
 {
 	template<typename F, typename Ret, typename Params, int arity, bool isMember>
 	struct TupleCall
-	{
-	};
+	{};
 
 	template<typename F, typename Ret, typename Params>
 	struct TupleCall<F, Ret, Params, 0, false>
@@ -83,7 +82,7 @@ namespace LBind
 	{};
 
 #define CONVERT(z, n, d) \
-	LBind::Convert<typename Undecorate<BOOST_PP_CAT(T, n)>::type>::to(o.state(), BOOST_PP_CAT(t, n));
+	lbind::Convert<typename Undecorate<BOOST_PP_CAT(T, n)>::type>::to(o.state(), BOOST_PP_CAT(t, n));
 
 #define BOOST_PP_LOCAL_MACRO(n) \
 	template<BOOST_PP_ENUM_PARAMS(n, typename T)> 						\

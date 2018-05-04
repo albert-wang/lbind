@@ -6,7 +6,7 @@
 #include <cassert>
 #include <iostream>
 
-namespace LBind
+namespace lbind
 {
 	Scope module(lua_State * s)
 	{

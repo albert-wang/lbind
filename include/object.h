@@ -7,7 +7,7 @@
 #include <boost/mpl/logical.hpp>
 #include <iostream>
 
-namespace LBind
+namespace lbind
 {
 	/*
 		This exposes two different forms of object, Object and StackObject.

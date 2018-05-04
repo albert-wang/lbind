@@ -4,7 +4,7 @@
 #include <cassert>
 #include "lua.hpp"
 
-namespace LBind
+namespace lbind
 {
 	StackCheck::StackCheck(lua_State * l, int consumed, int provided)
 		:s(l)

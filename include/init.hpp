@@ -1,7 +1,7 @@
 #pragma once
 #include "lua.hpp"
 
-namespace LBind
+namespace lbind
 {
 	void open(lua_State *);
 

@@ -5,7 +5,7 @@
 
 #include "binddsl.hpp"
 
-using namespace LBind;
+using namespace lbind;
 
 namespace
 {

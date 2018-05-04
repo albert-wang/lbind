@@ -134,7 +134,7 @@ namespace
 	}
 }
 
-using namespace LBind;
+using namespace lbind;
 BOOST_AUTO_TEST_CASE(basic_classes)
 {
 	ConstructFixture c;

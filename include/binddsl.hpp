@@ -6,7 +6,7 @@
 
 #include "classes.hpp"
 
-namespace LBind
+namespace lbind
 {
 	/*
 		Exposes a simple API to bind functions

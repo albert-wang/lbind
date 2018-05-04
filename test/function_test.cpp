@@ -51,7 +51,7 @@ BOOST_AUTO_TEST_CASE(integer_function)
 {
 	StateFixture f;
 
-	LBind::registerFunction(f.state, LUA_RIDX_GLOBALS, "addone", addone);
+	lbind::registerFunction(f.state, LUA_RIDX_GLOBALS, "addone", addone);
 	const char * script = "c = addone(4)";
 
 	BOOST_CHECK(!dostring(f.state, script));
@@ -65,7 +65,7 @@ BOOST_AUTO_TEST_CASE(integer_function_fail_cast)
 {
 	StateFixture f;
 
-	LBind::registerFunction(f.state, LUA_RIDX_GLOBALS, "addone", addone);
+	lbind::registerFunction(f.state, LUA_RIDX_GLOBALS, "addone", addone);
 	const char * script = "c = addone(4.2)";
 	BOOST_CHECK(dostring(f.state, script));
 }
@@ -74,7 +74,7 @@ BOOST_AUTO_TEST_CASE(integer_function_correct_cast)
 {
 	StateFixture f;
 
-	LBind::registerFunction(f.state, LUA_RIDX_GLOBALS, "addone", addone);
+	lbind::registerFunction(f.state, LUA_RIDX_GLOBALS, "addone", addone);
 	const char * script = "c = addone(4.0)";
 
 	BOOST_CHECK(!dostring(f.state, script));
@@ -88,7 +88,7 @@ BOOST_AUTO_TEST_CASE(integer_limits)
 	StateFixture f;
 
 	boost::int32_t limit = std::numeric_limits<boost::int32_t>::max() - 1;
-	LBind::registerFunction(f.state, LUA_RIDX_GLOBALS, "addone", addone);
+	lbind::registerFunction(f.state, LUA_RIDX_GLOBALS, "addone", addone);
 
 	std::string script = "c = addone(" + boost::lexical_cast<std::string>(limit) + ")";
 
@@ -104,7 +104,7 @@ BOOST_AUTO_TEST_CASE(arbitrary_convertions)
 {
 	StateFixture f;
 
-	LBind::registerFunction(f.state, LUA_RIDX_GLOBALS, "multiply", multiply);
+	lbind::registerFunction(f.state, LUA_RIDX_GLOBALS, "multiply", multiply);
 	std::string script = "c = multiply(42, 2)";
 	BOOST_CHECK(!dostring(f.state, script.c_str()));
 
@@ -117,7 +117,7 @@ BOOST_AUTO_TEST_CASE(arbitrary_convertions_overflow_behavior)
 {
 	StateFixture f;
 
-	LBind::registerFunction(f.state, LUA_RIDX_GLOBALS, "multiply", multiply);
+	lbind::registerFunction(f.state, LUA_RIDX_GLOBALS, "multiply", multiply);
 	std::string script = "c = multiply(1, 270)";
 
 #ifdef CHECK_INTEGER_OVERFLOW
@@ -135,7 +135,7 @@ BOOST_AUTO_TEST_CASE(writing_to_globals_in_function_work)
 {
 	StateFixture f;
 
-	LBind::registerFunction(f.state, LUA_RIDX_GLOBALS, "makeglobal", makeglobal);
+	lbind::registerFunction(f.state, LUA_RIDX_GLOBALS, "makeglobal", makeglobal);
 	std::string script = "makeglobal(42, 'c')";
 	BOOST_CHECK(!dostring(f.state, script.c_str()));
 
@@ -150,8 +150,8 @@ BOOST_AUTO_TEST_CASE(nested_function_calls)
 {
 	StateFixture f;
 
-	LBind::registerFunction(f.state, LUA_RIDX_GLOBALS, "invoke", call_something);
-	LBind::registerFunction(f.state, LUA_RIDX_GLOBALS, "multiply", multiply);
+	lbind::registerFunction(f.state, LUA_RIDX_GLOBALS, "invoke", call_something);
+	lbind::registerFunction(f.state, LUA_RIDX_GLOBALS, "multiply", multiply);
 
 	std::string script = "function something() c = multiply(1.5, 200) end\n"
 		"invoke('something')";
@@ -167,7 +167,7 @@ BOOST_AUTO_TEST_CASE(basic_recursion)
 {
 	StateFixture f;
 
-	LBind::registerFunction(f.state, LUA_RIDX_GLOBALS, "invoke", call_something);
+	lbind::registerFunction(f.state, LUA_RIDX_GLOBALS, "invoke", call_something);
 	std::string script = "c = 10; function recurse() c = c - 1; if c > 0 then invoke('recurse') end end recurse()";
 
 	BOOST_CHECK(!dostring(f.state, script.c_str()));
@@ -182,7 +182,7 @@ BOOST_AUTO_TEST_CASE(bind_closure)
 	StateFixture f;
 
 	int count = 0;
-	LBind::registerFunction(f.state, LUA_RIDX_GLOBALS, "incr", [&count]()
+	lbind::registerFunction(f.state, LUA_RIDX_GLOBALS, "incr", [&count]()
 	{
 		count++;
 	});
@@ -197,7 +197,7 @@ BOOST_AUTO_TEST_CASE(bind_simple_function)
 {
 	StateFixture f;
 
-	LBind::registerFunction(f.state, LUA_RIDX_GLOBALS, "constant", constant);
+	lbind::registerFunction(f.state, LUA_RIDX_GLOBALS, "constant", constant);
 
 	std::string script = "c = constant()";
 	BOOST_CHECK(!dostring(f.state, script.c_str()));
@@ -212,7 +212,7 @@ BOOST_AUTO_TEST_CASE(bind_closure_args)
 	StateFixture f;
 
 	int count = 0;
-	LBind::registerFunction(f.state, LUA_RIDX_GLOBALS, "incrby", [&count](size_t a)
+	lbind::registerFunction(f.state, LUA_RIDX_GLOBALS, "incrby", [&count](size_t a)
 	{
 		count += a;
 		return count;
@@ -233,8 +233,8 @@ BOOST_AUTO_TEST_CASE(overloaded_functions)
 {
 	StateFixture f;
 
-	LBind::registerFunction(f.state, LUA_RIDX_GLOBALS, "add", add_string);
-	LBind::registerFunction(f.state, LUA_RIDX_GLOBALS, "add", add_float);
+	lbind::registerFunction(f.state, LUA_RIDX_GLOBALS, "add", add_string);
+	lbind::registerFunction(f.state, LUA_RIDX_GLOBALS, "add", add_float);
 
 	std::string script = "a = add(2, 5); b = add('a', 'b');";
 	BOOST_CHECK(!dostring(f.state, script.c_str()));
@@ -253,8 +253,8 @@ BOOST_AUTO_TEST_CASE(overloaded_function_no_overload_failure)
 {
 	StateFixture f;
 
-	LBind::registerFunction(f.state, LUA_RIDX_GLOBALS, "add", add_string);
-	LBind::registerFunction(f.state, LUA_RIDX_GLOBALS, "add", add_float);
+	lbind::registerFunction(f.state, LUA_RIDX_GLOBALS, "add", add_string);
+	lbind::registerFunction(f.state, LUA_RIDX_GLOBALS, "add", add_float);
 
 	std::string script = "a = add(2, 'bcd5');";
 	BOOST_CHECK(dostring(f.state, script.c_str()));
@@ -264,8 +264,8 @@ BOOST_AUTO_TEST_CASE(overloaded_function_no_overload_failure_2)
 {
 	StateFixture f;
 
-	LBind::registerFunction(f.state, LUA_RIDX_GLOBALS, "add", add_int);
-	LBind::registerFunction(f.state, LUA_RIDX_GLOBALS, "add", add_float);
+	lbind::registerFunction(f.state, LUA_RIDX_GLOBALS, "add", add_int);
+	lbind::registerFunction(f.state, LUA_RIDX_GLOBALS, "add", add_float);
 
 	std::string script = "a = add('bw1', 'w2');";
 	BOOST_CHECK(dostring(f.state, script.c_str()));
@@ -276,7 +276,7 @@ BOOST_AUTO_TEST_CASE(string_to_integer_conversion_is_implicit)
 {
 	StateFixture f;
 
-	LBind::registerFunction(f.state, LUA_RIDX_GLOBALS, "add", add_int);
+	lbind::registerFunction(f.state, LUA_RIDX_GLOBALS, "add", add_int);
 	std::string script = "a = add('1', '2');";
 	BOOST_CHECK(!dostring(f.state, script.c_str()));
 
@@ -289,7 +289,7 @@ BOOST_AUTO_TEST_CASE(string_to_integer_conversion_is_implicit)
 //COROUTINES work!
 BOOST_AUTO_TEST_CASE(coroutines_work)
 {
-	using namespace LBind;
+	using namespace lbind;
 
 	StateFixture f;
 	Coroutine thread = cast<Coroutine>(globals(f.state)["th"]);

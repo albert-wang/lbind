@@ -1,6 +1,6 @@
 #include "exceptions.hpp"
 
-namespace LBind
+namespace lbind
 {
 	BadCast::BadCast(const char * what)
 		:std::runtime_error(what)

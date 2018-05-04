@@ -5,9 +5,7 @@
 #include "function.hpp"
 #include "policies.hpp"
 
-#include <boost/preprocessor/iteration/local.hpp>
-
-namespace LBind
+namespace lbind
 {
 	class Scope;
 
@@ -186,14 +184,15 @@ namespace LBind
 			}
 		};
 
-#define BOOST_PP_LOCAL_LIMITS (1, 10)
-#define FORWARD_ARGS(z, n, d) BOOST_PP_COMMA_IF(n) std::forward<BOOST_PP_CAT(T, n)>(BOOST_PP_CAT(t, n))
-#define BOOST_PP_LOCAL_MACRO(n) \
-		template<typename R, BOOST_PP_ENUM_PARAMS(n, typename T)> \
-		struct BOOST_PP_CAT(Construct, n) \
-		{ static R * invoke(Ignored*, BOOST_PP_ENUM_BINARY_PARAMS(n, T, &&t)) { R * result = new R(BOOST_PP_REPEAT(n, FORWARD_ARGS, ~)); return static_cast<R *>(ownership(result, Owned)); }};
-
-#include BOOST_PP_LOCAL_ITERATE()
+		template<typename R, typename ...T>
+		struct Construct
+		{
+			static R * invoke(Ignored*, T&&... args)
+			{
+				R * result = new R(std::forward<T>(args)...);
+				return static_cast<R *>(ownership(result, Owned));
+			}
+		};
 
 		template<typename T>
 		class ClassRegistrar
@@ -204,6 +203,7 @@ namespace LBind
 				return 0;
 			}
 
+			//GC operations, deletes the object if it is owned by lua.
 			static int collect(lua_State * s)
 			{
 				//Stack is val
@@ -217,6 +217,7 @@ namespace LBind
 				return 0;
 			}
 
+			// Processes indexing operations.
 			static int index(lua_State * s)
 			{
 				//Stack is [val, key]
@@ -227,10 +228,12 @@ namespace LBind
 				//Stack is now [val, key, metatable]
 				lua_pushvalue(s, -2);
 				int type = lua_rawget(s, -2);
+
 				//Stack is now [val, key, metatable, index-result]
+				//Standard access?
 				if (type != LUA_TLIGHTUSERDATA)
 				{
-					//Move the top element to the 3rd element
+					//Move the top element to the 3rd element, and pop 3 values.
 					lua_rotate(s, -1, 4);
 					lua_pop(s, 3);
 
@@ -238,13 +241,15 @@ namespace LBind
 				}
 				else
 				{
-					//A member access.
+					//A member access. Get the member description, the base pointer, and then push
+					// the value up.
 					MemberBase * member = static_cast<MemberBase *>(lua_touserdata(s, -1));
 					void * target = ownershipless(*(void **)lua_touserdata(s, -4));
 
 					member->push(s, target);
 
-					//Stack is now [val, key, metatable, index-result, get]
+					//Stack is now [val, key, metatable, index-result, get]. Rotate value to the end of
+					//the stack, and pop the useless values.
 					lua_rotate(s, -1, 5);
 					lua_pop(s, 4);
 					return 1;
@@ -293,7 +298,7 @@ namespace LBind
 				return 0;
 			}
 		public:
-			ClassRegistrar(lua_State * state, LBind::StackObject meta, ClassRepresentation * rep, int scopeIndex, Scope * containingScope)
+			ClassRegistrar(lua_State * state, lbind::StackObject meta, ClassRepresentation * rep, int scopeIndex, Scope * containingScope)
 				:state(state)
 				,metatable(meta)
 				,representation(rep)
@@ -321,12 +326,13 @@ namespace LBind
 				return *this;
 			}
 
-#define BOOST_PP_LOCAL_LIMITS (1, 10)
-#define BOOST_PP_LOCAL_MACRO(n) \
-			template<BOOST_PP_ENUM_PARAMS(n, typename T)>	\
-			ClassRegistrar& constructor() { boost::fusion::vector<null_policy_t> np; constructors.push_back(Detail::createFunction(BOOST_PP_CAT(Construct, n)<T, BOOST_PP_ENUM_PARAMS(n, T)>::invoke, np)); return *this; }
-
-#include BOOST_PP_LOCAL_ITERATE()
+			template<typename ...AT>
+			ClassRegistrar& constructor()
+			{
+				boost::fusion::vector<null_policy_t> np;
+				constructors.push_back(Detail::createFunction(Construct<T, AT...>::invoke, np));
+				return *this;
+			}
 
 			template<typename F, typename P>
 			ClassRegistrar& def(boost::string_ref name, F f, P p)
@@ -400,7 +406,7 @@ namespace LBind
 			{
 				StackCheck check(state, 1, 0);
 
-				using namespace LBind::Detail;
+				using namespace lbind::Detail;
 				assert(metatable.index() == lua_gettop(state));
 
 				Metatables<T>::instanceMetatableIndex = luaL_ref(state, LUA_REGISTRYINDEX);
@@ -454,7 +460,7 @@ namespace LBind
 			}
 		private:
 			lua_State * state;
-			LBind::StackObject metatable;
+			lbind::StackObject metatable;
 			ClassRepresentation * representation;
 
 			int scopeIndex;
@@ -506,7 +512,7 @@ namespace LBind
 			*val = in;
 
 			//Push the metatable
-			lua_rawgeti(state, LUA_REGISTRYINDEX, LBind::Detail::Metatables<typename boost::remove_pointer<Undecorated>::type>::instanceMetatableIndex);
+			lua_rawgeti(state, LUA_REGISTRYINDEX, lbind::Detail::Metatables<typename boost::remove_pointer<Undecorated>::type>::instanceMetatableIndex);
 
 			//Set metatable and return.
 			lua_setmetatable(state, -2);
@@ -568,7 +574,7 @@ namespace LBind
 			*val = in;
 
 			//Push the metatable
-			lua_rawgeti(state, LUA_REGISTRYINDEX, LBind::Detail::Metatables<Undecorated>::instanceMetatableIndex);
+			lua_rawgeti(state, LUA_REGISTRYINDEX, lbind::Detail::Metatables<Undecorated>::instanceMetatableIndex);
 
 			//Set metatable and return.
 			lua_setmetatable(state, -2);
@@ -582,7 +588,7 @@ namespace LBind
 	template<typename T>
 	Detail::ClassRegistrar<T> registerClass(lua_State * s, const char * name, int scopeIndex, Scope * scope)
 	{
-		LBind::StackCheck check(s, 0, 1);
+		lbind::StackCheck check(s, 0, 1);
 
 		//Create a new table.
 		lua_newtable(s);
@@ -593,6 +599,6 @@ namespace LBind
 		rep->name = name;
 
 		Detail::Metatables<T>::name = name;
-		return Detail::ClassRegistrar<T>(s, LBind::StackObject::fromStack(s, -1), rep, scopeIndex, scope);
+		return Detail::ClassRegistrar<T>(s, lbind::StackObject::fromStack(s, -1), rep, scopeIndex, scope);
 	}
 }
